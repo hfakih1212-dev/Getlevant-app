@@ -13,6 +13,7 @@ import OrderConfirmationScreen from '../screens/shopper/OrderConfirmationScreen'
 import MyOrdersScreen from '../screens/shopper/MyOrdersScreen'
 import ShipmentTrackingScreen from '../screens/shopper/ShipmentTrackingScreen'
 import VendorDashboardScreen from '../screens/vendor/VendorDashboardScreen'
+import ShipmentCreateScreen from '../screens/vendor/ShipmentCreateScreen'
 
 // ---------------------------------------------------------------------------
 // Param list types — imported by screens for prop typing
@@ -35,6 +36,7 @@ export type ShopperStackParamList = {
 
 export type VendorStackParamList = {
   VendorDashboard: undefined
+  ShipmentCreate: { orderId: string; orderNumber: string }
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +64,7 @@ function VendorStack() {
   return (
     <VendorNav.Navigator screenOptions={{ headerShown: false }}>
       <VendorNav.Screen name="VendorDashboard" component={VendorDashboardScreen} />
+      <VendorNav.Screen name="ShipmentCreate" component={ShipmentCreateScreen} />
     </VendorNav.Navigator>
   )
 }

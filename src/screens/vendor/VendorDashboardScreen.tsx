@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -9,9 +9,14 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
+import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
 import { Database } from '../../types/supabase'
+import type { VendorStackParamList } from '../../navigation/RootNavigator'
+
+type Props = NativeStackScreenProps<VendorStackParamList, 'VendorDashboard'>
 
 // ---------------------------------------------------------------------------
 // Domain types
@@ -136,9 +141,10 @@ type CardProps = {
   order: VendorOrder
   onAdvance: (orderId: string, next: OrderStatus) => Promise<void>
   advancing: boolean
+  onCreateShipment: (orderId: string, orderNumber: string) => void
 }
 
-function OrderCard({ order, onAdvance, advancing }: CardProps) {
+function OrderCard({ order, onAdvance, advancing, onCreateShipment }: CardProps) {
   const badge  = STATUS_BADGE[order.status]
   const action = NEXT_ACTION[order.status]
   const isPrimary = order.status === 'placed'
@@ -221,6 +227,17 @@ function OrderCard({ order, onAdvance, advancing }: CardProps) {
           )}
         </TouchableOpacity>
       ) : null}
+
+      {/* ── Assign Courier — shown on dispatched orders ── */}
+      {order.status === 'dispatched' ? (
+        <TouchableOpacity
+          style={styles.shipmentBtn}
+          onPress={() => onCreateShipment(order.id, order.order_number ?? '')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.shipmentBtnText}>Assign Courier</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   )
 }
@@ -229,7 +246,7 @@ function OrderCard({ order, onAdvance, advancing }: CardProps) {
 // VendorDashboardScreen
 // ---------------------------------------------------------------------------
 
-export default function VendorDashboardScreen() {
+export default function VendorDashboardScreen({ navigation }: Props) {
   const user = useAuthStore(s => s.user)
 
   const [orders, setOrders]       = useState<VendorOrder[]>([])
@@ -271,9 +288,7 @@ export default function VendorDashboardScreen() {
     setLoading(false)
   }, [user?.id])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useFocusEffect(useCallback(() => { load() }, [load]))
 
   // ---- Filtered orders for the active tab ----
 
@@ -315,6 +330,15 @@ export default function VendorDashboardScreen() {
     [],
   )
 
+  // ---- Shipment creation ----
+
+  const handleCreateShipment = useCallback(
+    (orderId: string, orderNumber: string) => {
+      navigation.navigate('ShipmentCreate', { orderId, orderNumber })
+    },
+    [navigation],
+  )
+
   // ---- Render helpers ----
 
   const renderItem: ListRenderItem<VendorOrder> = useCallback(
@@ -323,9 +347,10 @@ export default function VendorDashboardScreen() {
         order={item}
         onAdvance={handleAdvance}
         advancing={advancingId === item.id}
+        onCreateShipment={handleCreateShipment}
       />
     ),
-    [handleAdvance, advancingId],
+    [handleAdvance, advancingId, handleCreateShipment],
   )
 
   const keyExtractor = useCallback((item: VendorOrder) => item.id, [])
@@ -622,6 +647,22 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 14,
+    fontWeight: '600',
+    color: '#C8622A',
+  },
+  // Assign courier secondary button
+  shipmentBtn: {
+    marginTop: 8,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#C8622A',
+    backgroundColor: '#FFF3EC',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shipmentBtnText: {
+    fontSize: 13,
     fontWeight: '600',
     color: '#C8622A',
   },

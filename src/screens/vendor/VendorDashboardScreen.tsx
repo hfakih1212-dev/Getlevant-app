@@ -269,8 +269,15 @@ export default function VendorDashboardScreen({ navigation }: Props) {
       .eq('owner_id', user.id)
       .single()
 
-    if (storeErr || !store) {
-      setError(storeErr?.message ?? 'No store found for this account.')
+    // PGRST116 = no rows returned — vendor has no store yet, send to onboarding
+    if (storeErr?.code === 'PGRST116' || (!storeErr && !store)) {
+      navigation.replace('StoreOnboarding')
+      setLoading(false)
+      return
+    }
+
+    if (storeErr) {
+      setError(storeErr.message)
       setLoading(false)
       return
     }
@@ -382,8 +389,17 @@ export default function VendorDashboardScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{storeName}</Text>
-        <Text style={styles.headerSub}>Order Management</Text>
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>{storeName}</Text>
+          <Text style={styles.headerSub}>Order Management</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.inventoryBtn}
+          onPress={() => navigation.navigate('ProductManagement')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.inventoryBtnText}>Inventory</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tab bar */}
@@ -454,11 +470,16 @@ const styles = StyleSheet.create({
   },
   // Header
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E8E0D5',
+  },
+  headerText: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 24,
@@ -469,6 +490,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#7A6A5A',
     marginTop: 2,
+  },
+  inventoryBtn: {
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#C8622A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  inventoryBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#C8622A',
   },
   // Tab bar
   tabBar: {

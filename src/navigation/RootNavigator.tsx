@@ -7,6 +7,9 @@ import PhoneLoginScreen from '../screens/auth/PhoneLoginScreen'
 import OtpVerifyScreen from '../screens/auth/OtpVerifyScreen'
 import MarketplaceFeedScreen from '../screens/shopper/MarketplaceFeedScreen'
 import ProductDetailScreen from '../screens/shopper/ProductDetailScreen'
+import CartScreen from '../screens/shopper/CartScreen'
+import CheckoutScreen from '../screens/shopper/CheckoutScreen'
+import OrderConfirmationScreen from '../screens/shopper/OrderConfirmationScreen'
 import VendorDashboardScreen from '../screens/vendor/VendorDashboardScreen'
 
 // ---------------------------------------------------------------------------
@@ -21,6 +24,9 @@ export type AuthStackParamList = {
 export type ShopperStackParamList = {
   MarketplaceFeed: undefined
   ProductDetail: { productId: string }
+  Cart: undefined
+  Checkout: undefined
+  OrderConfirmation: { orderNumber: string }
 }
 
 export type VendorStackParamList = {
@@ -62,6 +68,9 @@ function ShopperStack() {
     <ShopperNav.Navigator screenOptions={{ headerShown: false }}>
       <ShopperNav.Screen name="MarketplaceFeed" component={MarketplaceFeedScreen} />
       <ShopperNav.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <ShopperNav.Screen name="Cart" component={CartScreen} />
+      <ShopperNav.Screen name="Checkout" component={CheckoutScreen} />
+      <ShopperNav.Screen name="OrderConfirmation" component={OrderConfirmationScreen} />
     </ShopperNav.Navigator>
   )
 }

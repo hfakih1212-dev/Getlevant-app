@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Image,
-  Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollView,
@@ -16,6 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
+import { useCartStore } from '../../store/useCartStore'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
 
 type Props = NativeStackScreenProps<ShopperStackParamList, 'ProductDetail'>
@@ -32,7 +31,7 @@ const fetchProduct = (id: string) =>
     .from('products')
     .select(
       `
-      id, name, description, price_usd,
+      id, name, description, price_usd, store_id,
       stores ( name, region, whatsapp ),
       product_images ( id, url, position ),
       product_variants ( id, size, color, color_hex, stock )
@@ -159,6 +158,8 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
 
   const canOrder = !!(selectedVariant && selectedVariant.stock > 0)
 
+  const addItem = useCartStore((s) => s.addItem)
+
   // ---- Handlers ----
 
   const handleScrollEnd = useCallback(
@@ -185,47 +186,24 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
     [isColorAvailable],
   )
 
-  const handleOrder = useCallback(async () => {
+  const handleAddToCart = useCallback(() => {
     if (!selectedVariant || !product) return
 
-    // Strip everything except digits — WhatsApp deep links require plain E.164 without '+'
-    const phone = (store?.whatsapp ?? '').replace(/\D/g, '')
+    addItem({
+      productId: product.id,
+      variantId: selectedVariant.id,
+      storeId: product.store_id,
+      name: product.name,
+      storeName: store?.name ?? '',
+      imageUrl: images[0]?.url ?? null,
+      priceUsd: product.price_usd,
+      size: selectedVariant.size,
+      color: selectedVariant.color,
+      colorHex: selectedVariant.color_hex,
+    })
 
-    if (!phone) {
-      Alert.alert('Unavailable', 'This store has not set up a WhatsApp number yet.')
-      return
-    }
-
-    // Build the order message
-    const lines = [
-      `Hello! I'd like to place an order from your store on Souk 🛍️`,
-      '',
-      `📦 *${product.name}*`,
-      ...(selectedVariant.size  ? [`• Size: ${selectedVariant.size}`]  : []),
-      ...(selectedVariant.color ? [`• Colour: ${selectedVariant.color}`] : []),
-      `• Price: $${Number(product.price_usd).toFixed(0)} USD`,
-    ]
-    const message = lines.join('\n')
-    const encoded  = encodeURIComponent(message)
-
-    const deepLink = `whatsapp://send?phone=${phone}&text=${encoded}`
-    const webLink  = `https://wa.me/${phone}?text=${encoded}`
-
-    try {
-      if (await Linking.canOpenURL(deepLink)) {
-        await Linking.openURL(deepLink)
-      } else if (await Linking.canOpenURL(webLink)) {
-        await Linking.openURL(webLink)
-      } else {
-        Alert.alert(
-          'WhatsApp Not Available',
-          'Install WhatsApp to complete your order, or contact the store directly.',
-        )
-      }
-    } catch {
-      Alert.alert('Error', 'Could not open WhatsApp. Please try again.')
-    }
-  }, [product, selectedVariant, store])
+    navigation.navigate('Cart')
+  }, [addItem, product, selectedVariant, store, images, navigation])
 
   // ---- Loading / error guards ----
 
@@ -386,12 +364,12 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
       <View style={styles.actionBar}>
         <TouchableOpacity
           style={[styles.orderBtn, !canOrder && styles.orderBtnMuted]}
-          onPress={handleOrder}
+          onPress={handleAddToCart}
           disabled={!canOrder}
           activeOpacity={0.85}
         >
           <Text style={styles.orderBtnText}>
-            {canOrder ? 'Order via WhatsApp' : 'Select options'}
+            {canOrder ? 'Add to Bag' : 'Select options'}
           </Text>
         </TouchableOpacity>
       </View>

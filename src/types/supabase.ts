@@ -107,6 +107,7 @@ export type Database = {
           subtotal_usd: number
           total_usd: number
           updated_at: string | null
+          whatsapp_sent: boolean
         }
         Insert: {
           created_at?: string | null
@@ -123,6 +124,7 @@ export type Database = {
           subtotal_usd: number
           total_usd: number
           updated_at?: string | null
+          whatsapp_sent?: boolean
         }
         Update: {
           created_at?: string | null
@@ -139,6 +141,7 @@ export type Database = {
           subtotal_usd?: number
           total_usd?: number
           updated_at?: string | null
+          whatsapp_sent?: boolean
         }
         Relationships: [
           {
@@ -265,6 +268,94 @@ export type Database = {
           },
         ]
       }
+      shipment_events: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          event_type: string
+          id: string
+          location: string | null
+          occurred_at: string
+          raw_payload: Json | null
+          shipment_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          event_type: string
+          id?: string
+          location?: string | null
+          occurred_at?: string
+          raw_payload?: Json | null
+          shipment_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          event_type?: string
+          id?: string
+          location?: string | null
+          occurred_at?: string
+          raw_payload?: Json | null
+          shipment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_events_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipments: {
+        Row: {
+          courier_name: string
+          courier_phone: string | null
+          courier_type: Database["public"]["Enums"]["courier_type"]
+          created_at: string | null
+          id: string
+          order_id: string
+          status: Database["public"]["Enums"]["shipment_status"]
+          tracking_id: string | null
+          updated_at: string | null
+          webhook_data: Json | null
+        }
+        Insert: {
+          courier_name: string
+          courier_phone?: string | null
+          courier_type: Database["public"]["Enums"]["courier_type"]
+          created_at?: string | null
+          id?: string
+          order_id: string
+          status?: Database["public"]["Enums"]["shipment_status"]
+          tracking_id?: string | null
+          updated_at?: string | null
+          webhook_data?: Json | null
+        }
+        Update: {
+          courier_name?: string
+          courier_phone?: string | null
+          courier_type?: Database["public"]["Enums"]["courier_type"]
+          created_at?: string | null
+          id?: string
+          order_id?: string
+          status?: Database["public"]["Enums"]["shipment_status"]
+          tracking_id?: string | null
+          updated_at?: string | null
+          webhook_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stores: {
         Row: {
           created_at: string | null
@@ -311,7 +402,9 @@ export type Database = {
           created_at: string | null
           email: string | null
           id: string
+          notification_prefs: Json
           phone: string | null
+          push_token: string | null
           role: string
           store_id: string | null
         }
@@ -319,7 +412,9 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id: string
+          notification_prefs?: Json
           phone?: string | null
+          push_token?: string | null
           role?: string
           store_id?: string | null
         }
@@ -327,7 +422,9 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+          notification_prefs?: Json
           phone?: string | null
+          push_token?: string | null
           role?: string
           store_id?: string | null
         }
@@ -338,9 +435,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_user_role: { Args: never; Returns: string }
       owns_store: { Args: { p_store_id: string }; Returns: boolean }
     }
     Enums: {
+      courier_type:
+        | "aramex"
+        | "dhl"
+        | "fedex"
+        | "tnt"
+        | "local_courier"
+        | "internal"
+        | "other"
       order_status:
         | "placed"
         | "confirmed"
@@ -351,6 +457,14 @@ export type Database = {
         | "cancelled"
       payment_method: "whatsapp" | "cash_on_delivery" | "bank_transfer"
       payment_status: "pending" | "paid" | "failed" | "refunded"
+      shipment_status:
+        | "pending"
+        | "picked_up"
+        | "in_transit"
+        | "out_for_delivery"
+        | "delivered"
+        | "failed"
+        | "returned"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -481,6 +595,15 @@ export const Constants = {
   },
   public: {
     Enums: {
+      courier_type: [
+        "aramex",
+        "dhl",
+        "fedex",
+        "tnt",
+        "local_courier",
+        "internal",
+        "other",
+      ],
       order_status: [
         "placed",
         "confirmed",
@@ -492,7 +615,15 @@ export const Constants = {
       ],
       payment_method: ["whatsapp", "cash_on_delivery", "bank_transfer"],
       payment_status: ["pending", "paid", "failed", "refunded"],
+      shipment_status: [
+        "pending",
+        "picked_up",
+        "in_transit",
+        "out_for_delivery",
+        "delivered",
+        "failed",
+        "returned",
+      ],
     },
   },
 } as const
-

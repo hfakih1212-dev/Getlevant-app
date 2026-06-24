@@ -10,6 +10,8 @@ import ProductDetailScreen from '../screens/shopper/ProductDetailScreen'
 import CartScreen from '../screens/shopper/CartScreen'
 import CheckoutScreen from '../screens/shopper/CheckoutScreen'
 import OrderConfirmationScreen from '../screens/shopper/OrderConfirmationScreen'
+import MyOrdersScreen from '../screens/shopper/MyOrdersScreen'
+import ShipmentTrackingScreen from '../screens/shopper/ShipmentTrackingScreen'
 import VendorDashboardScreen from '../screens/vendor/VendorDashboardScreen'
 
 // ---------------------------------------------------------------------------
@@ -27,6 +29,8 @@ export type ShopperStackParamList = {
   Cart: undefined
   Checkout: undefined
   OrderConfirmation: { orderNumber: string }
+  MyOrders: undefined
+  ShipmentTracking: { orderId: string }
 }
 
 export type VendorStackParamList = {
@@ -71,6 +75,8 @@ function ShopperStack() {
       <ShopperNav.Screen name="Cart" component={CartScreen} />
       <ShopperNav.Screen name="Checkout" component={CheckoutScreen} />
       <ShopperNav.Screen name="OrderConfirmation" component={OrderConfirmationScreen} />
+      <ShopperNav.Screen name="MyOrders" component={MyOrdersScreen} />
+      <ShopperNav.Screen name="ShipmentTracking" component={ShipmentTrackingScreen} />
     </ShopperNav.Navigator>
   )
 }

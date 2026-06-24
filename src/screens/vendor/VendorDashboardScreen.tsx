@@ -400,6 +400,15 @@ export default function VendorDashboardScreen({ navigation }: Props) {
         >
           <Text style={styles.inventoryBtnText}>Inventory</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.profileBtn}
+          onPress={() => navigation.navigate('Profile')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.profileBtnText}>
+            {(user?.phone ?? user?.email ?? '?').replace(/^\+/, '').charAt(0).toUpperCase()}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tab bar */}
@@ -505,6 +514,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#C8622A',
+  },
+  profileBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#C8622A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  profileBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FAF7F2',
   },
   // Tab bar
   tabBar: {

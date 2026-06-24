@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../store/useAuthStore'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
 
 type Props = NativeStackScreenProps<ShopperStackParamList, 'MarketplaceFeed'>
@@ -108,6 +109,9 @@ function ProductCard({ item, onPress }: CardProps) {
 // ---------------------------------------------------------------------------
 
 export default function MarketplaceFeedScreen({ navigation }: Props) {
+  const user = useAuthStore(s => s.user)
+  const initial = (user?.phone ?? user?.email ?? '?').replace(/^\+/, '').charAt(0).toUpperCase()
+
   const [products, setProducts] = useState<FeedProduct[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -160,6 +164,18 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.heading}>Marketplace</Text>
+        <TouchableOpacity
+          style={styles.profileBtn}
+          onPress={() => navigation.navigate('Profile')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.profileBtnText}>{initial}</Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
         data={products}
         keyExtractor={keyExtractor}
@@ -168,9 +184,6 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <Text style={styles.heading}>Marketplace</Text>
-        }
         ListEmptyComponent={
           <View style={styles.centered}>
             <Text style={styles.emptyText}>No products available yet.</Text>
@@ -195,20 +208,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  listContent: {
-    paddingHorizontal: H_PAD,
-    paddingBottom: 40,
-  },
-  row: {
+  // Top header row
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: COL_GAP,
+    paddingHorizontal: H_PAD,
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E0D5',
   },
   heading: {
     fontSize: 28,
     fontWeight: '700',
     color: '#1C1612',
-    marginTop: 8,
-    marginBottom: 20,
+  },
+  profileBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#C8622A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FAF7F2',
+  },
+  listContent: {
+    paddingHorizontal: H_PAD,
+    paddingTop: 16,
+    paddingBottom: 40,
+  },
+  row: {
+    justifyContent: 'space-between',
+    marginBottom: COL_GAP,
   },
   // Card
   card: {

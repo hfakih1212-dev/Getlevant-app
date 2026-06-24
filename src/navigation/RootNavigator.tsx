@@ -16,6 +16,7 @@ import VendorDashboardScreen from '../screens/vendor/VendorDashboardScreen'
 import ShipmentCreateScreen from '../screens/vendor/ShipmentCreateScreen'
 import ProductManagementScreen from '../screens/vendor/ProductManagementScreen'
 import StoreOnboardingScreen from '../screens/vendor/StoreOnboardingScreen'
+import ProfileScreen from '../screens/shared/ProfileScreen'
 
 // ---------------------------------------------------------------------------
 // Param list types — imported by screens for prop typing
@@ -34,6 +35,7 @@ export type ShopperStackParamList = {
   OrderConfirmation: { orderNumber: string }
   MyOrders: undefined
   ShipmentTracking: { orderId: string }
+  Profile: undefined
 }
 
 export type VendorStackParamList = {
@@ -41,6 +43,7 @@ export type VendorStackParamList = {
   StoreOnboarding: undefined
   ShipmentCreate: { orderId: string; orderNumber: string }
   ProductManagement: undefined
+  Profile: undefined
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +74,7 @@ function VendorStack() {
       <VendorNav.Screen name="StoreOnboarding" component={StoreOnboardingScreen} />
       <VendorNav.Screen name="ShipmentCreate" component={ShipmentCreateScreen} />
       <VendorNav.Screen name="ProductManagement" component={ProductManagementScreen} />
+      <VendorNav.Screen name="Profile" component={ProfileScreen} />
     </VendorNav.Navigator>
   )
 }
@@ -86,6 +90,7 @@ function ShopperStack() {
       <ShopperNav.Screen name="OrderConfirmation" component={OrderConfirmationScreen} />
       <ShopperNav.Screen name="MyOrders" component={MyOrdersScreen} />
       <ShopperNav.Screen name="ShipmentTracking" component={ShipmentTrackingScreen} />
+      <ShopperNav.Screen name="Profile" component={ProfileScreen} />
     </ShopperNav.Navigator>
   )
 }

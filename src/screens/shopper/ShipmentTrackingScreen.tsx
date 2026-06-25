@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   ScrollView,
@@ -270,6 +270,45 @@ export default function ShipmentTrackingScreen({ route, navigation }: Props) {
   useEffect(() => {
     load()
   }, [load])
+
+  // ---- Realtime: append new shipment_events without a full reload ----
+
+  const shipmentIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    shipmentIdRef.current = shipment?.id ?? null
+  }, [shipment?.id])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`shipment-events-${orderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  'INSERT',
+          schema: 'public',
+          table:  'shipment_events',
+        },
+        (payload) => {
+          const row = payload.new as ShipmentEvent & { shipment_id: string }
+          // Only apply if it belongs to the current shipment
+          if (row.shipment_id !== shipmentIdRef.current) return
+          setEvents(prev => [...prev, row])
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event:  'UPDATE',
+          schema: 'public',
+          table:  'shipments',
+          filter: `order_id=eq.${orderId}`,
+        },
+        () => load(),
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [orderId, load])
 
   const storeName = useMemo(() => resolveStoreName(order?.stores), [order])
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -309,6 +309,39 @@ export default function VendorDashboardScreen({ navigation }: Props) {
   }, [user?.id])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
+
+  // ---- Realtime: auto-reload when a new order arrives for this store ----
+
+  useEffect(() => {
+    let storeId: string | null = null
+
+    // Fetch storeId once so we can scope the subscription
+    supabase
+      .from('stores')
+      .select('id')
+      .eq('owner_id', user?.id ?? '')
+      .single()
+      .then(({ data }) => {
+        if (!data?.id) return
+        storeId = data.id
+
+        const channel = supabase
+          .channel(`vendor-orders-${storeId}`)
+          .on(
+            'postgres_changes',
+            {
+              event:  'INSERT',
+              schema: 'public',
+              table:  'orders',
+              filter: `store_id=eq.${storeId}`,
+            },
+            () => load(),
+          )
+          .subscribe()
+
+        return () => { supabase.removeChannel(channel) }
+      })
+  }, [user?.id, load])
 
   // ---- Filtered orders for the active tab ----
 

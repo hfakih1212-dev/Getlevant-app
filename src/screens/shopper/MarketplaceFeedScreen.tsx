@@ -5,6 +5,7 @@ import {
   FlatList,
   Image,
   ListRenderItem,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
+import { useCartStore } from '../../store/useCartStore'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
 
 type Props = NativeStackScreenProps<ShopperStackParamList, 'MarketplaceFeed'>
@@ -111,26 +113,32 @@ function ProductCard({ item, onPress }: CardProps) {
 export default function MarketplaceFeedScreen({ navigation }: Props) {
   const user = useAuthStore(s => s.user)
   const initial = (user?.phone ?? user?.email ?? '?').replace(/^\+/, '').charAt(0).toUpperCase()
+  const cartCount = useCartStore(s => s.items.reduce((sum, i) => sum + i.quantity, 0))
 
-  const [products, setProducts] = useState<FeedProduct[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [products,  setProducts]  = useState<FeedProduct[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error,     setError]     = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      const { data, error: fetchError } = await fetchFeed()
-      if (cancelled) return
-      if (fetchError) {
-        setError(fetchError.message)
-      } else {
-        setProducts(data ?? [])
-      }
-      setLoading(false)
+  const load = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true)
+    setError(null)
+    const { data, error: fetchError } = await fetchFeed()
+    if (fetchError) {
+      setError(fetchError.message)
+    } else {
+      setProducts(data ?? [])
     }
-    load()
-    return () => { cancelled = true }
+    setLoading(false)
+    setRefreshing(false)
   }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true)
+    load(true)
+  }, [load])
 
   const handlePress = useCallback(
     (item: FeedProduct) => {
@@ -167,13 +175,27 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.heading}>Marketplace</Text>
-        <TouchableOpacity
-          style={styles.profileBtn}
-          onPress={() => navigation.navigate('Profile')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.profileBtnText}>{initial}</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.cartBtn}
+            onPress={() => navigation.navigate('Cart')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.cartIcon}>🛍</Text>
+            {cartCount > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{cartCount > 9 ? '9+' : cartCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.profileBtn}
+            onPress={() => navigation.navigate('Profile')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.profileBtnText}>{initial}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -184,6 +206,14 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#C8622A"
+            colors={['#C8622A']}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.centered}>
             <Text style={styles.emptyText}>No products available yet.</Text>
@@ -223,6 +253,38 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#1C1612',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  cartBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cartIcon: {
+    fontSize: 24,
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#C8622A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FAF7F2',
+    lineHeight: 12,
   },
   profileBtn: {
     width: 40,

@@ -43,7 +43,8 @@ const fetchVendorOrders = (storeId: string) =>
         id, quantity, unit_price_usd,
         product:products ( name ),
         variant:product_variants ( size, color )
-      )
+      ),
+      shipments ( id )
     `,
     )
     .eq('store_id', storeId)
@@ -231,8 +232,8 @@ function OrderCard({ order, onAdvance, advancing, onCreateShipment, onCancel }: 
         </TouchableOpacity>
       ) : null}
 
-      {/* ── Assign Courier — shown on dispatched orders ── */}
-      {order.status === 'dispatched' ? (
+      {/* ── Assign Courier — shown on dispatched orders without a shipment yet ── */}
+      {order.status === 'dispatched' && !order.shipments?.length ? (
         <TouchableOpacity
           style={styles.shipmentBtn}
           onPress={() => onCreateShipment(order.id, order.order_number ?? '')}

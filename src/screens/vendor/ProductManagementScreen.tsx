@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   ListRenderItem,
   Platform,
@@ -13,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
@@ -28,13 +30,19 @@ type Props = NativeStackScreenProps<VendorStackParamList, 'ProductManagement'>
 const fetchStoreProducts = (storeId: string) =>
   supabase
     .from('products')
-    .select('id, name, price_usd, status, product_variants ( stock )')
+    .select('id, name, price_usd, status, product_variants ( stock ), product_images ( url, position )')
     .eq('store_id', storeId)
     .order('created_at', { ascending: false })
 
 type StoreProduct = NonNullable<
   Awaited<ReturnType<typeof fetchStoreProducts>>['data']
 >[0]
+
+const MAX_PHOTOS = 4
+
+interface ImagePick { uri: string; key: string }
+let _imgKey = 0
+const mkImgKey = () => String(_imgKey++)
 
 interface VariantDraft {
   key: string
@@ -58,34 +66,44 @@ type ScreenMode = 'list' | 'add'
 // ---------------------------------------------------------------------------
 
 function ProductCard({ product }: { product: StoreProduct }) {
-  const totalStock = product.product_variants.reduce(
-    (sum, v) => sum + (v.stock ?? 0), 0,
-  )
+  const totalStock   = product.product_variants.reduce((sum, v) => sum + (v.stock ?? 0), 0)
   const variantCount = product.product_variants.length
   const isActive     = product.status === 'active'
+  const coverUrl     = [...(product.product_images ?? [])]
+    .sort((a, b) => a.position - b.position)[0]?.url ?? null
 
   return (
     <View style={styles.productCard}>
-      <View style={styles.productCardHeader}>
-        <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
-        <View style={[styles.statusBadge, isActive ? styles.badgeActive : styles.badgeInactive]}>
-          <Text style={[styles.statusBadgeText, isActive ? styles.badgeActiveText : styles.badgeInactiveText]}>
-            {isActive ? 'Active' : 'Inactive'}
+      <View style={styles.productCardRow}>
+        {coverUrl ? (
+          <Image source={{ uri: coverUrl }} style={styles.productThumb} resizeMode="cover" />
+        ) : (
+          <View style={[styles.productThumb, styles.productThumbPlaceholder]} />
+        )}
+
+        <View style={styles.productCardBody}>
+          <View style={styles.productCardHeader}>
+            <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
+            <View style={[styles.statusBadge, isActive ? styles.badgeActive : styles.badgeInactive]}>
+              <Text style={[styles.statusBadgeText, isActive ? styles.badgeActiveText : styles.badgeInactiveText]}>
+                {isActive ? 'Active' : 'Inactive'}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.productPrice}>
+            ${Number(product.price_usd).toFixed(2)} USD
           </Text>
+
+          <View style={styles.productMeta}>
+            <Text style={styles.variantCount}>
+              {variantCount} variant{variantCount !== 1 ? 's' : ''}
+            </Text>
+            <Text style={totalStock > 0 ? styles.stockIn : styles.stockOut}>
+              {totalStock > 0 ? `${totalStock} in stock` : 'Out of stock'}
+            </Text>
+          </View>
         </View>
-      </View>
-
-      <Text style={styles.productPrice}>
-        ${Number(product.price_usd).toFixed(2)} USD
-      </Text>
-
-      <View style={styles.productMeta}>
-        <Text style={styles.variantCount}>
-          {variantCount} variant{variantCount !== 1 ? 's' : ''}
-        </Text>
-        <Text style={totalStock > 0 ? styles.stockIn : styles.stockOut}>
-          {totalStock > 0 ? `${totalStock} in stock` : 'Out of stock'}
-        </Text>
       </View>
     </View>
   )
@@ -202,6 +220,7 @@ export default function ProductManagementScreen({ navigation }: Props) {
   const [description, setDescription] = useState('')
   const [price,       setPrice]       = useState('')
   const [variants,    setVariants]    = useState<VariantDraft[]>(() => [mkVariant()])
+  const [imagePicks,  setImagePicks]  = useState<ImagePick[]>([])
   const [saving,      setSaving]      = useState(false)
   const [formError,   setFormError]   = useState<string | null>(null)
 
@@ -246,7 +265,33 @@ export default function ProductManagementScreen({ navigation }: Props) {
     setDescription('')
     setPrice('')
     setVariants([mkVariant()])
+    setImagePicks([])
     setFormError(null)
+  }, [])
+
+  const handlePickImage = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow access to your photo library to add product images.')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_PHOTOS,
+      quality: 0.75,
+      allowsEditing: false,
+    })
+    if (result.canceled) return
+    setImagePicks(prev => {
+      const remaining = MAX_PHOTOS - prev.length
+      const toAdd = result.assets.slice(0, remaining).map(a => ({ uri: a.uri, key: mkImgKey() }))
+      return [...prev, ...toAdd]
+    })
+  }, [])
+
+  const removeImage = useCallback((key: string) => {
+    setImagePicks(prev => prev.filter(p => p.key !== key))
   }, [])
 
   const openAdd = useCallback(() => {
@@ -336,6 +381,29 @@ export default function ProductManagementScreen({ navigation }: Props) {
         )
 
       if (variantsErr) throw variantsErr
+
+      // Step C — upload images and record URLs
+      for (let i = 0; i < imagePicks.length; i++) {
+        const pick = imagePicks[i]
+        const ext  = pick.uri.split('.').pop()?.toLowerCase() ?? 'jpg'
+        const path = `${storeId}/${product.id}/${i}-${Date.now()}.${ext}`
+
+        const response  = await fetch(pick.uri)
+        const blob      = await response.blob()
+        const { error: uploadErr } = await supabase.storage
+          .from('product-images')
+          .upload(path, blob, { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` })
+        if (uploadErr) throw uploadErr
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(path)
+
+        const { error: imgRowErr } = await supabase
+          .from('product_images')
+          .insert({ product_id: product.id, url: publicUrl, position: i })
+        if (imgRowErr) throw imgRowErr
+      }
 
       // Success — reload list and return to list mode
       await load()
@@ -433,6 +501,40 @@ export default function ProductManagementScreen({ navigation }: Props) {
                 keyboardType="decimal-pad"
                 returnKeyType="next"
               />
+            </View>
+
+            {/* ── Photos ── */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                Photos{' '}
+                <Text style={styles.optionalLabel}>(up to {MAX_PHOTOS})</Text>
+              </Text>
+
+              <View style={styles.photoGrid}>
+                {imagePicks.map(pick => (
+                  <View key={pick.key} style={styles.photoSlot}>
+                    <Image source={{ uri: pick.uri }} style={styles.photoThumb} resizeMode="cover" />
+                    <TouchableOpacity
+                      style={styles.photoRemoveBtn}
+                      onPress={() => removeImage(pick.key)}
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    >
+                      <Text style={styles.photoRemoveText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                {imagePicks.length < MAX_PHOTOS && (
+                  <TouchableOpacity
+                    style={styles.photoAddSlot}
+                    onPress={handlePickImage}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.photoAddIcon}>+</Text>
+                    <Text style={styles.photoAddLabel}>Add Photo</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
 
             {/* ── Variants ── */}
@@ -604,13 +706,27 @@ const styles = StyleSheet.create({
   productCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    padding: 16,
-    gap: 6,
+    overflow: 'hidden',
     shadowColor: '#1C1612',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
+  },
+  productCardRow: {
+    flexDirection: 'row',
+  },
+  productThumb: {
+    width: 80,
+    height: 80,
+  },
+  productThumbPlaceholder: {
+    backgroundColor: '#E8E0D5',
+  },
+  productCardBody: {
+    flex: 1,
+    padding: 12,
+    gap: 4,
   },
   productCardHeader: {
     flexDirection: 'row',
@@ -619,13 +735,13 @@ const styles = StyleSheet.create({
   },
   productName: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1C1612',
     marginRight: 8,
   },
   productPrice: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#C8622A',
   },
@@ -633,8 +749,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
-    paddingTop: 10,
+    marginTop: 2,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#F0EBE3',
   },
@@ -769,6 +885,62 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#1C1612',
     minHeight: 44,
+  },
+  // Photo grid
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  photoSlot: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  photoThumb: {
+    width: 80,
+    height: 80,
+  },
+  photoRemoveBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(28,22,18,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoRemoveText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  photoAddSlot: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#D9CFC4',
+    borderStyle: 'dashed',
+    backgroundColor: '#FAF7F2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
+  },
+  photoAddIcon: {
+    fontSize: 22,
+    color: '#7A6A5A',
+    lineHeight: 26,
+  },
+  photoAddLabel: {
+    fontSize: 10,
+    color: '#7A6A5A',
+    fontWeight: '500',
   },
   // Add Variant button
   addVariantBtn: {

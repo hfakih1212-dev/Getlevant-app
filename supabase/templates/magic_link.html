@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin:0;padding:0;background:#FAF7F2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F2;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(28,22,18,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:#C8622A;padding:28px 40px;">
+              <span style="font-size:26px;font-weight:800;color:#FAF7F2;letter-spacing:-0.5px;">Souk</span>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px;">
+              <p style="margin:0 0 8px;font-size:15px;color:#7A6A5A;">Your login code</p>
+              <h1 style="margin:0 0 32px;font-size:48px;font-weight:800;letter-spacing:12px;color:#C8622A;font-variant-numeric:tabular-nums;">
+                {{ .Token }}
+              </h1>
+
+              <p style="margin:0 0 24px;font-size:15px;line-height:22px;color:#1C1612;">
+                Enter this code in the Souk app to sign in. It expires in <strong>1 hour</strong>.
+              </p>
+
+              <p style="margin:0 0 8px;font-size:13px;color:#7A6A5A;">
+                Alternatively, open the app on the same device and tap the button below:
+              </p>
+
+              <a href="{{ .ConfirmationURL }}"
+                 style="display:inline-block;margin-top:8px;padding:14px 28px;background:#C8622A;color:#FAF7F2;font-size:15px;font-weight:700;text-decoration:none;border-radius:10px;">
+                Sign In to Souk
+              </a>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:24px 40px;border-top:1px solid #F0EBE3;">
+              <p style="margin:0;font-size:12px;color:#B0A090;line-height:18px;">
+                If you didn't request this code, you can safely ignore this email.<br />
+                This code can only be used once.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

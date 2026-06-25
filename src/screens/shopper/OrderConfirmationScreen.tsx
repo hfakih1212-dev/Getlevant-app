@@ -35,6 +35,14 @@ export default function OrderConfirmationScreen({ route, navigation }: Props) {
         >
           <Text style={styles.btnText}>Continue Shopping</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.ordersLink}
+          onPress={() => navigation.navigate('MyOrders')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.ordersLinkText}>View My Orders</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   )
@@ -99,5 +107,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FAF7F2',
     letterSpacing: 0.2,
+  },
+  ordersLink: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ordersLinkText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#C8622A',
   },
 })

@@ -2,12 +2,17 @@
   "expo": {
     "name": "Souk",
     "slug": "souk-app",
+    "scheme": "souk",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.soukapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -16,13 +21,19 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.soukapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e8d64369-afb7-434a-8897-69ab61d29e37"
+      }
+    }
   }
 }

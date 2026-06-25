@@ -55,7 +55,7 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
     if (!canSubmit) return
     setSubmitting(true)
 
-    const { error } = await supabase
+    const { data: shipment, error } = await supabase
       .from('shipments')
       .insert({
         order_id:      orderId,
@@ -65,12 +65,22 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
         courier_phone: courierPhone.trim() || null,
         status:        'pending',
       })
+      .select('id')
+      .single()
 
-    if (error) {
-      Alert.alert('Failed to Create Shipment', error.message)
+    if (error || !shipment) {
+      Alert.alert('Failed to Create Shipment', error?.message ?? 'Unknown error')
       setSubmitting(false)
       return
     }
+
+    // Seed the timeline with the first event so the shopper sees immediate feedback
+    await supabase.from('shipment_events').insert({
+      shipment_id:  shipment.id,
+      event_type:   'order_dispatched',
+      description:  `Handed to ${courierName.trim()} (${COURIER_OPTIONS.find(o => o.value === courierType)?.label ?? courierType})`,
+      occurred_at:  new Date().toISOString(),
+    })
 
     navigation.goBack()
   }, [canSubmit, orderId, courierType, courierName, trackingId, courierPhone, navigation])

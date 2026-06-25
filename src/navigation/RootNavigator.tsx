@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { useAuthStore } from '../store/useAuthStore'
 import PhoneLoginScreen from '../screens/auth/PhoneLoginScreen'
 import OtpVerifyScreen from '../screens/auth/OtpVerifyScreen'
+import CheckEmailScreen from '../screens/auth/CheckEmailScreen'
 import MarketplaceFeedScreen from '../screens/shopper/MarketplaceFeedScreen'
 import ProductDetailScreen from '../screens/shopper/ProductDetailScreen'
 import CartScreen from '../screens/shopper/CartScreen'
@@ -24,7 +25,8 @@ import ProfileScreen from '../screens/shared/ProfileScreen'
 
 export type AuthStackParamList = {
   PhoneLogin: undefined
-  OtpVerify: { phone: string }
+  OtpVerify: { email: string }
+  CheckEmail: { email: string }
 }
 
 export type ShopperStackParamList = {
@@ -63,6 +65,7 @@ function AuthStack() {
     <AuthNav.Navigator screenOptions={{ headerShown: false }}>
       <AuthNav.Screen name="PhoneLogin" component={PhoneLoginScreen} />
       <AuthNav.Screen name="OtpVerify" component={OtpVerifyScreen} />
+      <AuthNav.Screen name="CheckEmail" component={CheckEmailScreen} />
     </AuthNav.Navigator>
   )
 }

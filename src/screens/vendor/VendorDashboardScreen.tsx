@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   ListRenderItem,
   StyleSheet,
@@ -142,9 +143,10 @@ type CardProps = {
   onAdvance: (orderId: string, next: OrderStatus) => Promise<void>
   advancing: boolean
   onCreateShipment: (orderId: string, orderNumber: string) => void
+  onCancel: (orderId: string) => void
 }
 
-function OrderCard({ order, onAdvance, advancing, onCreateShipment }: CardProps) {
+function OrderCard({ order, onAdvance, advancing, onCreateShipment, onCancel }: CardProps) {
   const badge  = STATUS_BADGE[order.status]
   const action = NEXT_ACTION[order.status]
   const isPrimary = order.status === 'placed'
@@ -236,6 +238,17 @@ function OrderCard({ order, onAdvance, advancing, onCreateShipment }: CardProps)
           activeOpacity={0.8}
         >
           <Text style={styles.shipmentBtnText}>Assign Courier</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {/* ── Cancel — only for pre-dispatch statuses ── */}
+      {(order.status === 'placed' || order.status === 'confirmed' || order.status === 'preparing') ? (
+        <TouchableOpacity
+          style={styles.cancelBtn}
+          onPress={() => onCancel(order.id)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.cancelBtnText}>Cancel Order</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -337,6 +350,37 @@ export default function VendorDashboardScreen({ navigation }: Props) {
     [],
   )
 
+  // ---- Order cancellation ----
+
+  const handleCancel = useCallback(
+    (orderId: string) => {
+      Alert.alert(
+        'Cancel Order',
+        'Are you sure you want to cancel this order? This cannot be undone.',
+        [
+          { text: 'Keep Order', style: 'cancel' },
+          {
+            text: 'Cancel Order',
+            style: 'destructive',
+            onPress: async () => {
+              const { error: updateErr } = await supabase
+                .from('orders')
+                .update({ status: 'cancelled' })
+                .eq('id', orderId)
+
+              if (!updateErr) {
+                setOrders(prev =>
+                  prev.map(o => (o.id === orderId ? { ...o, status: 'cancelled' } : o)),
+                )
+              }
+            },
+          },
+        ],
+      )
+    },
+    [],
+  )
+
   // ---- Shipment creation ----
 
   const handleCreateShipment = useCallback(
@@ -355,9 +399,10 @@ export default function VendorDashboardScreen({ navigation }: Props) {
         onAdvance={handleAdvance}
         advancing={advancingId === item.id}
         onCreateShipment={handleCreateShipment}
+        onCancel={handleCancel}
       />
     ),
-    [handleAdvance, advancingId, handleCreateShipment],
+    [handleAdvance, advancingId, handleCreateShipment, handleCancel],
   )
 
   const keyExtractor = useCallback((item: VendorOrder) => item.id, [])
@@ -708,6 +753,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#C8622A',
+  },
+  // Cancel order button
+  cancelBtn: {
+    marginTop: 8,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#9CA3AF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   // Assign courier secondary button
   shipmentBtn: {

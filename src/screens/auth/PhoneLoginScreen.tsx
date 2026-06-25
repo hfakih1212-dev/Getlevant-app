@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native'
+import * as Linking from 'expo-linking'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
@@ -17,31 +18,31 @@ import { AuthStackParamList } from '../../navigation/RootNavigator'
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'PhoneLogin'>
 
-const COUNTRY_CODE = '+961'
-
 export default function PhoneLoginScreen({ navigation }: Props) {
-  const [localNumber, setLocalNumber] = useState('')
+  const [email, setEmail]     = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
 
-  const digits = localNumber.replace(/\D/g, '')
-  const phone = `${COUNTRY_CODE}${digits}`
-  const isValid = digits.length >= 7
+  const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 
   const handleSend = async () => {
     if (!isValid) {
-      setError('Enter a valid Lebanese number (7–8 digits after +961).')
+      setError('Enter a valid email address.')
       return
     }
     setError(null)
     setLoading(true)
-    const { error: apiError } = await supabase.auth.signInWithOtp({ phone })
+    const redirectTo = Linking.createURL('auth-callback')
+    const { error: apiError } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { shouldCreateUser: true, emailRedirectTo: redirectTo },
+    })
     setLoading(false)
     if (apiError) {
       setError(apiError.message)
       return
     }
-    navigation.navigate('OtpVerify', { phone })
+    navigation.navigate('CheckEmail', { email: email.trim() })
   }
 
   return (
@@ -57,30 +58,23 @@ export default function PhoneLoginScreen({ navigation }: Props) {
           <View style={styles.header}>
             <Text style={styles.title}>Welcome to Souk</Text>
             <Text style={styles.subtitle}>
-              Enter your Lebanese mobile number to sign in or create an account.
+              Enter your email address to sign in or create an account.
             </Text>
           </View>
 
-          <View style={styles.inputRow}>
-            <View style={styles.prefix}>
-              <Text style={styles.prefixText}>{COUNTRY_CODE}</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={localNumber}
-              onChangeText={(t) => {
-                setError(null)
-                setLocalNumber(t)
-              }}
-              placeholder="71 234 567"
-              placeholderTextColor="#A89880"
-              keyboardType="phone-pad"
-              maxLength={12}
-              autoFocus
-              returnKeyType="send"
-              onSubmitEditing={handleSend}
-            />
-          </View>
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={(t) => { setError(null); setEmail(t) }}
+            placeholder="you@example.com"
+            placeholderTextColor="#A89880"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+            returnKeyType="send"
+            onSubmitEditing={handleSend}
+          />
 
           {error ? (
             <View style={styles.errorBox}>
@@ -91,13 +85,13 @@ export default function PhoneLoginScreen({ navigation }: Props) {
           <TouchableOpacity
             style={[styles.button, (!isValid || loading) && styles.buttonMuted]}
             onPress={handleSend}
-            disabled={loading}
+            disabled={loading || !isValid}
             activeOpacity={0.8}
           >
             {loading ? (
               <ActivityIndicator color="#FAF7F2" />
             ) : (
-              <Text style={styles.buttonText}>Send Code</Text>
+              <Text style={styles.buttonText}>Send Link</Text>
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -107,22 +101,15 @@ export default function PhoneLoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#FAF7F2',
-  },
-  flex: {
-    flex: 1,
-  },
+  safe: { flex: 1, backgroundColor: '#FAF7F2' },
+  flex: { flex: 1 },
   container: {
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 64,
     paddingBottom: 40,
   },
-  header: {
-    marginBottom: 40,
-  },
+  header: { marginBottom: 40 },
   title: {
     fontSize: 32,
     fontWeight: '700',
@@ -134,37 +121,17 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: '#7A6A5A',
   },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  input: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#D9CFC4',
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-    minHeight: 56,
-    marginBottom: 16,
-  },
-  prefix: {
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    backgroundColor: '#F0EBE3',
-    borderRightWidth: 1.5,
-    borderRightColor: '#D9CFC4',
-    justifyContent: 'center',
-  },
-  prefixText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1612',
-  },
-  input: {
-    flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    fontSize: 18,
+    fontSize: 16,
     color: '#1C1612',
     minHeight: 56,
+    marginBottom: 16,
   },
   errorBox: {
     backgroundColor: '#FDF0EC',
@@ -186,9 +153,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  buttonMuted: {
-    opacity: 0.5,
-  },
+  buttonMuted: { opacity: 0.5 },
   buttonText: {
     color: '#FAF7F2',
     fontSize: 16,

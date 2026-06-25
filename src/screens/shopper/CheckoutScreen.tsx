@@ -17,6 +17,7 @@ import { useAuthStore } from '../../store/useAuthStore'
 import { useCartStore } from '../../store/useCartStore'
 import { Database } from '../../types/supabase'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
+import { notifyNewOrder } from '../../lib/whatsapp'
 
 type Props = NativeStackScreenProps<ShopperStackParamList, 'Checkout'>
 type PaymentMethod = Database['public']['Enums']['payment_method']
@@ -136,6 +137,7 @@ export default function CheckoutScreen({ navigation }: Props) {
 
       if (itemsError) throw itemsError
 
+      notifyNewOrder(order.id)
       clearCart()
       navigation.navigate('OrderConfirmation', {
         orderNumber: order.order_number ?? '',

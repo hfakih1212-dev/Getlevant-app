@@ -1,5 +1,7 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -15,10 +17,10 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
 import type { VendorStackParamList } from '../../navigation/RootNavigator'
 
-type Props = NativeStackScreenProps<VendorStackParamList, 'StoreOnboarding'>
+type Props = NativeStackScreenProps<VendorStackParamList, 'StoreSettings'>
 
 // ---------------------------------------------------------------------------
-// Lebanon region options
+// Constants
 // ---------------------------------------------------------------------------
 
 const LEBANON_REGIONS = [
@@ -34,110 +36,150 @@ const LEBANON_REGIONS = [
 
 type LebanonRegion = typeof LEBANON_REGIONS[number]
 
-// ---------------------------------------------------------------------------
-// Phone normalization — handles common Lebanese formats
-// ---------------------------------------------------------------------------
-
 function normalizePhone(raw: string): string {
-  // Strip whitespace, dashes, dots, parens
   const cleaned = raw.replace(/[\s\-\(\)\.]/g, '')
   if (!cleaned) return ''
-  if (cleaned.startsWith('+'))    return cleaned           // already E.164
-  if (cleaned.startsWith('00'))   return '+' + cleaned.slice(2)
-  if (cleaned.startsWith('961'))  return '+' + cleaned     // missing leading +
-  if (cleaned.startsWith('0'))    return '+961' + cleaned.slice(1)
-  return '+961' + cleaned                                  // bare local digits
+  if (cleaned.startsWith('+'))   return cleaned
+  if (cleaned.startsWith('00'))  return '+' + cleaned.slice(2)
+  if (cleaned.startsWith('961')) return '+' + cleaned
+  if (cleaned.startsWith('0'))   return '+961' + cleaned.slice(1)
+  return '+961' + cleaned
 }
 
 // ---------------------------------------------------------------------------
-// StoreOnboardingScreen
+// StoreSettingsScreen
 // ---------------------------------------------------------------------------
 
-export default function StoreOnboardingScreen({ navigation }: Props) {
+export default function StoreSettingsScreen({ navigation }: Props) {
   const user = useAuthStore(s => s.user)
 
+  const [storeId,     setStoreId]     = useState<string | null>(null)
   const [name,        setName]        = useState('')
   const [description, setDescription] = useState('')
   const [whatsapp,    setWhatsapp]    = useState('')
   const [region,      setRegion]      = useState<LebanonRegion | null>(null)
-  const [saving,      setSaving]      = useState(false)
-  const [formError,   setFormError]   = useState<string | null>(null)
 
-  // ---- Derived phone preview ----
+  const [loading, setLoading] = useState(true)
+  const [saving,  setSaving]  = useState(false)
+  const [error,   setError]   = useState<string | null>(null)
+
   const normalizedPhone = normalizePhone(whatsapp)
 
-  // ---- Validation ----
-  const canSubmit =
-    name.trim().length > 0 &&
-    !saving
+  // ---- Load existing store ----
 
-  // ---- Submit ----
-  const handleSubmit = useCallback(async () => {
-    setFormError(null)
-
-    if (!name.trim()) {
-      setFormError('Store name is required.')
-      return
-    }
+  useEffect(() => {
     if (!user?.id) return
+    let cancelled = false
 
+    async function load() {
+      const { data, error: fetchErr } = await supabase
+        .from('stores')
+        .select('id, name, description, whatsapp, region')
+        .eq('owner_id', user!.id)
+        .maybeSingle()
+
+      if (cancelled) return
+
+      if (fetchErr) {
+        setError(fetchErr.message)
+        setLoading(false)
+        return
+      }
+
+      if (data) {
+        setStoreId(data.id)
+        setName(data.name ?? '')
+        setDescription(data.description ?? '')
+        setWhatsapp(data.whatsapp ?? '')
+        setRegion((data.region as LebanonRegion) ?? null)
+      }
+
+      setLoading(false)
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [user?.id])
+
+  // ---- Save ----
+
+  const canSave = name.trim().length > 0 && !saving
+
+  const handleSave = useCallback(async () => {
+    if (!storeId || !canSave) return
+    setError(null)
     setSaving(true)
 
-    const { error } = await supabase
+    const { error: updateErr } = await supabase
       .from('stores')
-      .insert({
-        owner_id:    user.id,
+      .update({
         name:        name.trim(),
         description: description.trim() || null,
         whatsapp:    normalizedPhone || null,
-        region:      region,
-        status:      'active',
+        region:      region!,
       })
+      .eq('id', storeId)
 
-    if (error) {
-      setFormError(error.message)
-      setSaving(false)
-      return
+    if (updateErr) {
+      setError(updateErr.message)
+    } else {
+      Alert.alert('Saved', 'Store settings updated successfully.', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ])
     }
 
-    // Replace this screen with a fresh VendorDashboard — store now exists
-    navigation.replace('VendorDashboard')
-  }, [name, description, normalizedPhone, region, user?.id, navigation])
+    setSaving(false)
+  }, [storeId, canSave, name, description, normalizedPhone, region, navigation])
 
   // ---- Render ----
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.centered]}>
+        <ActivityIndicator size="large" color="#C8622A" />
+      </SafeAreaView>
+    )
+  }
+
+  if (!storeId) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.centered]}>
+        <Text style={styles.errorText}>No store found for your account.</Text>
+        <TouchableOpacity style={styles.backLink} onPress={() => navigation.goBack()}>
+          <Text style={styles.backLinkText}>Go back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    )
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {/* ── Header ── */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Store Settings</Text>
+          <View style={styles.headerRight} />
+        </View>
+
         <ScrollView
           style={styles.flex}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Brand header ── */}
-          <View style={styles.brand}>
-            <View style={styles.brandMark}>
-              <Text style={styles.brandMarkText}>S</Text>
-            </View>
-            <Text style={styles.brandName}>Souk</Text>
-          </View>
-
-          {/* ── Welcome copy ── */}
-          <View style={styles.welcome}>
-            <Text style={styles.welcomeTitle}>Open Your Store</Text>
-            <Text style={styles.welcomeBody}>
-              You're one step away from reaching customers across Lebanon.
-              Fill in your store details to get started.
-            </Text>
-          </View>
-
-          {/* ── Store details ── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Store Details</Text>
-
+          {/* ── Store Details ── */}
+          <Text style={styles.sectionLabel}>STORE DETAILS</Text>
+          <View style={styles.card}>
             <Text style={styles.inputLabel}>
               Store Name <Text style={styles.required}>*</Text>
             </Text>
@@ -151,7 +193,7 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
               autoCapitalize="words"
             />
 
-            <Text style={styles.inputLabel}>
+            <Text style={[styles.inputLabel, { marginTop: 4 }]}>
               Description <Text style={styles.optional}>(optional)</Text>
             </Text>
             <TextInput
@@ -167,14 +209,16 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
           </View>
 
           {/* ── Contact ── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Contact</Text>
-
+          <Text style={styles.sectionLabel}>WHATSAPP CONTACT</Text>
+          <View style={styles.card}>
             <Text style={styles.inputLabel}>
               WhatsApp Number <Text style={styles.optional}>(optional)</Text>
             </Text>
+            <Text style={styles.fieldHint}>
+              Vendors with a WhatsApp number receive new-order notifications instantly.
+            </Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { marginTop: 6 }]}
               value={whatsapp}
               onChangeText={setWhatsapp}
               placeholder="+961 70 123 456 or 03 123 456"
@@ -182,26 +226,19 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
               keyboardType="phone-pad"
               returnKeyType="done"
             />
-            {/* Live normalization preview */}
             {whatsapp.trim().length > 0 && (
               <Text style={styles.phonePreview}>
-                Saved as: <Text style={styles.phonePreviewValue}>{normalizedPhone}</Text>
+                Saves as: <Text style={styles.phonePreviewValue}>{normalizedPhone}</Text>
               </Text>
             )}
-            <Text style={styles.fieldHint}>
-              Local formats (03…, 70…) are automatically converted to international format.
-            </Text>
           </View>
 
           {/* ── Region ── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Region <Text style={styles.optional}>(optional)</Text>
-            </Text>
+          <Text style={styles.sectionLabel}>REGION</Text>
+          <View style={styles.card}>
             <Text style={styles.fieldHint}>
               Select your primary area, or leave blank if you deliver nationwide.
             </Text>
-
             <View style={styles.pillGrid}>
               {LEBANON_REGIONS.map(r => {
                 const selected = region === r
@@ -221,26 +258,26 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
             </View>
           </View>
 
-          {/* Inline error */}
-          {formError ? (
-            <Text style={styles.formError}>{formError}</Text>
+          {error ? (
+            <Text style={styles.errorText}>{error}</Text>
           ) : null}
 
-          {/* Bottom padding so sticky bar doesn't cover content */}
           <View style={{ height: 24 }} />
         </ScrollView>
 
-        {/* ── Sticky submit ── */}
+        {/* ── Sticky save ── */}
         <View style={styles.bottomBar}>
           <TouchableOpacity
-            style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
+            style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
+            onPress={handleSave}
+            disabled={!canSave}
             activeOpacity={0.85}
           >
-            <Text style={styles.submitBtnText}>
-              {saving ? 'Opening your store…' : 'Open My Store'}
-            </Text>
+            {saving ? (
+              <ActivityIndicator size="small" color="#FAF7F2" />
+            ) : (
+              <Text style={styles.saveBtnText}>Save Changes</Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -253,92 +290,72 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FAF7F2' },
-  flex: { flex: 1 },
+  safe:    { flex: 1, backgroundColor: '#FAF7F2' },
+  flex:    { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
 
-  scrollContent: {
-    padding: 20,
-    gap: 16,
-  },
-
-  // Brand header
-  brand: {
+  // Header
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E0D5',
   },
-  brandMark: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#C8622A',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  brandMarkText: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FAF7F2',
-    lineHeight: 28,
-  },
-  brandName: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1C1612',
-    letterSpacing: -0.5,
-  },
-
-  // Welcome
-  welcome: {
-    gap: 8,
-    marginBottom: 4,
-  },
-  welcomeTitle: {
-    fontSize: 26,
+  backBtn:     { width: 40, height: 44, justifyContent: 'center' },
+  backIcon:    { fontSize: 22, color: '#1C1612', lineHeight: 26 },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
     fontWeight: '700',
     color: '#1C1612',
-    letterSpacing: -0.5,
   },
-  welcomeBody: {
-    fontSize: 15,
-    color: '#7A6A5A',
-    lineHeight: 22,
+  headerRight: { width: 40 },
+
+  // Scroll
+  scrollContent: {
+    padding: 16,
+    gap: 8,
   },
 
-  // Section cards
-  section: {
+  // Section label
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#7A6A5A',
+    letterSpacing: 0.8,
+    paddingHorizontal: 4,
+    marginTop: 8,
+    marginBottom: 2,
+  },
+
+  // Card
+  card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 16,
-    gap: 10,
+    gap: 8,
     shadowColor: '#1C1612',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1C1612',
-    marginBottom: 2,
-  },
 
-  // Labels / hints
+  // Labels
   inputLabel: {
     fontSize: 13,
     fontWeight: '600',
     color: '#1C1612',
   },
-  required:     { color: '#C8622A' },
-  optional:     { fontWeight: '400', color: '#7A6A5A' },
+  required: { color: '#C8622A' },
+  optional: { fontWeight: '400', color: '#7A6A5A' },
   fieldHint: {
     fontSize: 12,
     color: '#7A6A5A',
     lineHeight: 17,
-    marginTop: -4,
   },
 
   // Inputs
@@ -358,22 +375,23 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
 
-  // Phone normalization preview
+  // Phone preview
   phonePreview: {
     fontSize: 12,
     color: '#7A6A5A',
-    marginTop: -4,
+    marginTop: -2,
   },
   phonePreviewValue: {
     fontWeight: '700',
     color: '#1C1612',
   },
 
-  // Region pill grid
+  // Region pills
   pillGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginTop: 4,
   },
   pill: {
     minHeight: 44,
@@ -386,25 +404,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pillSelected: {
-    backgroundColor: '#C8622A',
-    borderColor:     '#C8622A',
-  },
-  pillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1C1612',
-  },
-  pillTextSelected: {
-    color: '#FAF7F2',
-  },
+  pillSelected:     { backgroundColor: '#C8622A', borderColor: '#C8622A' },
+  pillText:         { fontSize: 13, fontWeight: '600', color: '#1C1612' },
+  pillTextSelected: { color: '#FAF7F2' },
 
-  // Inline error
-  formError: {
+  // Error
+  errorText: {
     fontSize: 13,
     color: '#C8622A',
     textAlign: 'center',
     paddingHorizontal: 8,
+  },
+
+  // Back link (no-store state)
+  backLink: {
+    marginTop: 16,
+    height: 44,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#C8622A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#C8622A',
   },
 
   // Sticky bottom
@@ -416,15 +442,15 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E8E0D5',
   },
-  submitBtn: {
+  saveBtn: {
     backgroundColor: '#C8622A',
     borderRadius: 12,
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  submitBtnDisabled: { opacity: 0.38 },
-  submitBtnText: {
+  saveBtnDisabled: { opacity: 0.38 },
+  saveBtnText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#FAF7F2',

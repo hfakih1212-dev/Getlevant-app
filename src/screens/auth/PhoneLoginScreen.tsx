@@ -32,7 +32,10 @@ export default function PhoneLoginScreen({ navigation }: Props) {
     }
     setError(null)
     setLoading(true)
-    const redirectTo = Linking.createURL('auth-callback')
+    const redirectTo =
+      Platform.OS === 'web'
+        ? (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081')
+        : Linking.createURL('auth-callback')
     const { error: apiError } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: { shouldCreateUser: true, emailRedirectTo: redirectTo },

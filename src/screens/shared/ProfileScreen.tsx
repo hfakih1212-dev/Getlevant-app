@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -57,6 +58,16 @@ function parseNotifPrefs(raw: Json): NotifPrefs {
 // Mock Expo push token generator
 // Produces a realistic ExponentPushToken[…] string for DB testing
 // ---------------------------------------------------------------------------
+
+function normalizePhone(raw: string): string {
+  const cleaned = raw.replace(/[\s\-\(\)\.]/g, '')
+  if (!cleaned) return ''
+  if (cleaned.startsWith('+'))   return cleaned
+  if (cleaned.startsWith('00'))  return '+' + cleaned.slice(2)
+  if (cleaned.startsWith('961')) return '+' + cleaned
+  if (cleaned.startsWith('0'))   return '+961' + cleaned.slice(1)
+  return '+961' + cleaned
+}
 
 function generateMockExpoToken(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'
@@ -141,6 +152,12 @@ export default function ProfileScreen() {
   const [savingPref,  setSavingPref]  = useState<keyof NotifPrefs | null>(null)
   const [registering, setRegistering] = useState(false)
 
+  // Phone number
+  const [phoneInput,  setPhoneInput]  = useState('')
+  const [savedPhone,  setSavedPhone]  = useState<string | null>(null)
+  const [savingPhone, setSavingPhone] = useState(false)
+  const normalizedPhone = normalizePhone(phoneInput)
+
   // ---- Load fresh user row ----
 
   useEffect(() => {
@@ -150,13 +167,17 @@ export default function ProfileScreen() {
     async function fetchUser() {
       const { data } = await supabase
         .from('users')
-        .select('notification_prefs, push_token')
+        .select('notification_prefs, push_token, phone')
         .eq('id', user!.id)
-        .single()
+        .maybeSingle()
 
-      if (cancelled || !data) return
+      if (cancelled) return
+      if (!data) { setLoading(false); return }
       setPrefs(parseNotifPrefs(data.notification_prefs))
       setPushToken(data.push_token)
+      const p = data.phone ?? null
+      setSavedPhone(p)
+      setPhoneInput(p ?? '')
       setLoading(false)
     }
 
@@ -188,6 +209,24 @@ export default function ProfileScreen() {
     },
     [prefs, user?.id],
   )
+
+  // ---- Save phone number ----
+
+  const handleSavePhone = useCallback(async () => {
+    if (!user?.id) return
+    const phone = normalizedPhone || null
+    setSavingPhone(true)
+    const { error } = await supabase
+      .from('users')
+      .update({ phone })
+      .eq('id', user.id)
+    if (error) {
+      Alert.alert('Update Failed', error.message)
+    } else {
+      setSavedPhone(phone)
+    }
+    setSavingPhone(false)
+  }, [user?.id, normalizedPhone])
 
   // ---- Re-register push token ----
 
@@ -270,6 +309,48 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
               </View>
+            </View>
+          </SectionCard>
+
+          {/* ── Phone number ── */}
+          <SectionLabel text="WhatsApp Contact" />
+          <SectionCard>
+            <View style={styles.phoneRow}>
+              <View style={styles.phoneLabelCol}>
+                <Text style={styles.rowLabel}>Phone Number</Text>
+                <Text style={styles.rowHint}>Used to send you order updates via WhatsApp</Text>
+                {phoneInput.trim().length > 0 && (
+                  <Text style={styles.phonePreview}>
+                    Saves as: <Text style={styles.phonePreviewValue}>{normalizedPhone}</Text>
+                  </Text>
+                )}
+              </View>
+            </View>
+            <View style={styles.phoneInputRow}>
+              <TextInput
+                style={styles.phoneInput}
+                value={phoneInput}
+                onChangeText={setPhoneInput}
+                placeholder="+961 70 123 456 or 03 123 456"
+                placeholderTextColor="#B0A090"
+                keyboardType="phone-pad"
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                style={[
+                  styles.phoneSaveBtn,
+                  (savingPhone || normalizedPhone === savedPhone) && styles.phoneSaveBtnDisabled,
+                ]}
+                onPress={handleSavePhone}
+                disabled={savingPhone || normalizedPhone === savedPhone}
+                activeOpacity={0.8}
+              >
+                {savingPhone ? (
+                  <ActivityIndicator size="small" color="#FAF7F2" />
+                ) : (
+                  <Text style={styles.phoneSaveBtnText}>Save</Text>
+                )}
+              </TouchableOpacity>
             </View>
           </SectionCard>
 
@@ -517,6 +598,58 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#C8622A',
+  },
+
+  // Phone section
+  phoneRow: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+  },
+  phoneLabelCol: {
+    gap: 3,
+  },
+  phonePreview: {
+    fontSize: 12,
+    color: '#7A6A5A',
+    marginTop: 2,
+  },
+  phonePreviewValue: {
+    fontWeight: '700',
+    color: '#1C1612',
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    gap: 10,
+  },
+  phoneInput: {
+    flex: 1,
+    backgroundColor: '#FAF7F2',
+    borderWidth: 1.5,
+    borderColor: '#D9CFC4',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#1C1612',
+    minHeight: 48,
+  },
+  phoneSaveBtn: {
+    height: 48,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    backgroundColor: '#C8622A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  phoneSaveBtnDisabled: { opacity: 0.38 },
+  phoneSaveBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FAF7F2',
   },
 
   // Sign out

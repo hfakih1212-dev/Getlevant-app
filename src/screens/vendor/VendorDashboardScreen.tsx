@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
+import { notifyStatusChanged } from '../../lib/whatsapp'
 import { useAuthStore } from '../../store/useAuthStore'
 import { Database } from '../../types/supabase'
 import type { VendorStackParamList } from '../../navigation/RootNavigator'
@@ -280,17 +281,16 @@ export default function VendorDashboardScreen({ navigation }: Props) {
       .from('stores')
       .select('id, name')
       .eq('owner_id', user.id)
-      .single()
+      .maybeSingle()
 
-    // PGRST116 = no rows returned — vendor has no store yet, send to onboarding
-    if (storeErr?.code === 'PGRST116' || (!storeErr && !store)) {
-      navigation.replace('StoreOnboarding')
+    if (storeErr) {
+      setError(storeErr.message)
       setLoading(false)
       return
     }
 
-    if (storeErr) {
-      setError(storeErr.message)
+    if (!store) {
+      navigation.replace('StoreOnboarding')
       setLoading(false)
       return
     }
@@ -320,7 +320,7 @@ export default function VendorDashboardScreen({ navigation }: Props) {
       .from('stores')
       .select('id')
       .eq('owner_id', user?.id ?? '')
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (!data?.id) return
         storeId = data.id
@@ -373,6 +373,7 @@ export default function VendorDashboardScreen({ navigation }: Props) {
         .eq('id', orderId)
 
       if (!updateErr) {
+        notifyStatusChanged(orderId, next)
         setOrders(prev =>
           prev.map(o => (o.id === orderId ? { ...o, status: next } : o)),
         )
@@ -477,6 +478,14 @@ export default function VendorDashboardScreen({ navigation }: Props) {
           activeOpacity={0.8}
         >
           <Text style={styles.inventoryBtnText}>Inventory</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.settingsBtn}
+          onPress={() => navigation.navigate('StoreSettings')}
+          activeOpacity={0.8}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+        >
+          <Text style={styles.settingsBtnText}>⚙</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.profileBtn}
@@ -593,6 +602,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#C8622A',
   },
+  settingsBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  settingsBtnText: {
+    fontSize: 22,
+    color: '#7A6A5A',
+  },
   profileBtn: {
     width: 40,
     height: 40,
@@ -600,7 +620,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#C8622A',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+    marginLeft: 4,
   },
   profileBtnText: {
     fontSize: 16,

@@ -38,7 +38,7 @@ const fetchProduct = (id: string) =>
     `,
     )
     .eq('id', id)
-    .single()
+    .maybeSingle()
 
 type ProductDetail = NonNullable<Awaited<ReturnType<typeof fetchProduct>>['data']>
 type Variant = ProductDetail['product_variants'][0]

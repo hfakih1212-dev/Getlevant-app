@@ -30,7 +30,7 @@ const fetchOrderDetail = (orderId: string) =>
       stores ( name )
     `)
     .eq('id', orderId)
-    .single()
+    .maybeSingle()
 
 type OrderDetail = NonNullable<Awaited<ReturnType<typeof fetchOrderDetail>>['data']>
 

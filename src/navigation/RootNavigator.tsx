@@ -17,6 +17,7 @@ import VendorDashboardScreen from '../screens/vendor/VendorDashboardScreen'
 import ShipmentCreateScreen from '../screens/vendor/ShipmentCreateScreen'
 import ProductManagementScreen from '../screens/vendor/ProductManagementScreen'
 import StoreOnboardingScreen from '../screens/vendor/StoreOnboardingScreen'
+import StoreSettingsScreen from '../screens/vendor/StoreSettingsScreen'
 import ProfileScreen from '../screens/shared/ProfileScreen'
 
 // ---------------------------------------------------------------------------
@@ -43,6 +44,7 @@ export type ShopperStackParamList = {
 export type VendorStackParamList = {
   VendorDashboard: undefined
   StoreOnboarding: undefined
+  StoreSettings: undefined
   ShipmentCreate: { orderId: string; orderNumber: string }
   ProductManagement: undefined
   Profile: undefined
@@ -75,6 +77,7 @@ function VendorStack() {
     <VendorNav.Navigator screenOptions={{ headerShown: false }}>
       <VendorNav.Screen name="VendorDashboard" component={VendorDashboardScreen} />
       <VendorNav.Screen name="StoreOnboarding" component={StoreOnboardingScreen} />
+      <VendorNav.Screen name="StoreSettings" component={StoreSettingsScreen} />
       <VendorNav.Screen name="ShipmentCreate" component={ShipmentCreateScreen} />
       <VendorNav.Screen name="ProductManagement" component={ProductManagementScreen} />
       <VendorNav.Screen name="Profile" component={ProfileScreen} />

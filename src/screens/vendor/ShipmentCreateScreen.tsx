@@ -82,6 +82,7 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
       occurred_at:  new Date().toISOString(),
     })
 
+    await supabase.from('orders').update({ status: 'dispatched' }).eq('id', orderId)
     navigation.goBack()
   }, [canSubmit, orderId, courierType, courierName, trackingId, courierPhone, navigation])
 

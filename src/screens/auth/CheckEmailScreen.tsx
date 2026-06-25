@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Linking,
+  Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
@@ -68,10 +69,13 @@ export default function CheckEmailScreen({ route, navigation }: Props) {
   }
 
   useEffect(() => {
-    // Check if the app was cold-started from a link
-    Linking.getInitialURL().then(processUrl)
+    // Web: supabase.auth detectSessionInUrl:true handles token extraction
+    // automatically from the URL hash; onAuthStateChange in useAuthStore fires
+    // and the navigator switches — no manual Linking needed here.
+    if (Platform.OS === 'web') return
 
-    // Listen for links while app is foregrounded
+    // Native: intercept the deep-link when the OS hands the URL to the app
+    Linking.getInitialURL().then(processUrl)
     const sub = Linking.addEventListener('url', ({ url }) => processUrl(url))
     return () => sub.remove()
   }, [])
@@ -98,9 +102,13 @@ export default function CheckEmailScreen({ route, navigation }: Props) {
         </Text>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Open the email and tap the link</Text>
+          <Text style={styles.cardTitle}>
+            {Platform.OS === 'web' ? 'Click the link in your email' : 'Open the email and tap the link'}
+          </Text>
           <Text style={styles.cardBody}>
-            Tap "Sign In to Souk" in the email — it will open directly in the app and log you in automatically.
+            {Platform.OS === 'web'
+              ? 'Click "Sign In to Souk" in the email — this browser tab will sign you in automatically.'
+              : 'Tap "Sign In to Souk" in the email — it will open directly in the app and log you in automatically.'}
           </Text>
         </View>
 

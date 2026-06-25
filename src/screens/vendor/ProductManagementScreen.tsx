@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +16,7 @@ import {
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
@@ -235,10 +236,16 @@ export default function ProductManagementScreen({ navigation }: Props) {
       .from('stores')
       .select('id, name')
       .eq('owner_id', user.id)
-      .single()
+      .maybeSingle()
 
-    if (storeErr || !store) {
-      setListError(storeErr?.message ?? 'No store found for this account.')
+    if (storeErr) {
+      setListError(storeErr.message)
+      setListLoading(false)
+      return
+    }
+
+    if (!store) {
+      navigation.replace('StoreOnboarding')
       setListLoading(false)
       return
     }
@@ -254,9 +261,9 @@ export default function ProductManagementScreen({ navigation }: Props) {
     }
 
     setListLoading(false)
-  }, [user?.id])
+  }, [user?.id, navigation])
 
-  useEffect(() => { load() }, [load])
+  useFocusEffect(useCallback(() => { load() }, [load]))
 
   // ---- Form helpers ----
 
@@ -328,24 +335,27 @@ export default function ProductManagementScreen({ navigation }: Props) {
   const handleSave = useCallback(async () => {
     setFormError(null)
 
-    // Validate
+    // Validate — use Alert so errors are visible regardless of scroll position
     if (!name.trim()) {
-      setFormError('Product name is required.')
+      Alert.alert('Missing field', 'Product name is required.')
       return
     }
     const priceNum = parseFloat(price)
     if (isNaN(priceNum) || priceNum <= 0) {
-      setFormError('Enter a valid price greater than 0.')
+      Alert.alert('Invalid price', 'Enter a price greater than 0.')
       return
     }
-    if (!storeId) return
+    if (!storeId) {
+      Alert.alert('No store', 'Could not find your store. Try going back and reopening Inventory.')
+      return
+    }
 
-    // Filter variants that have at least one field filled
+    // A variant row counts if at least one field is filled
     const validVariants = variants.filter(
       v => v.size.trim() || v.color.trim() || v.stock.trim(),
     )
     if (validVariants.length === 0) {
-      setFormError('Add at least one variant with size, color, or stock.')
+      Alert.alert('No variant', 'Fill in at least one variant row — add a size, colour, or stock count.')
       return
     }
 
@@ -417,7 +427,7 @@ export default function ProductManagementScreen({ navigation }: Props) {
     } finally {
       setSaving(false)
     }
-  }, [name, price, description, storeId, variants, load, resetForm])
+  }, [name, price, description, storeId, variants, imagePicks, load, resetForm])
 
   // ---- FlatList helpers ----
 

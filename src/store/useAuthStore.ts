@@ -20,30 +20,28 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   initialize: () => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      set({ session, loading: false })
-
       if (session?.user) {
         const { data: profile } = await supabase
           .from('users')
           .select('*')
           .eq('id', session.user.id)
-          .single()
-        set({ user: profile })
+          .maybeSingle()
+        set({ session, user: profile, loading: false })
+      } else {
+        set({ session, loading: false })
       }
     })
 
     supabase.auth.onAuthStateChange(async (event, session) => {
-      set({ session })
-
       if (session?.user) {
         const { data: profile } = await supabase
           .from('users')
           .select('*')
           .eq('id', session.user.id)
-          .single()
-        set({ user: profile })
+          .maybeSingle()
+        set({ session, user: profile })
       } else {
-        set({ user: null })
+        set({ session, user: null })
       }
     })
   },

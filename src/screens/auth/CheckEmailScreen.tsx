@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Linking,
+  KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
@@ -21,129 +23,136 @@ function maskEmail(email: string): string {
   return `${local.slice(0, 2)}***@${domain}`
 }
 
-// Pull a named param from a URL fragment or query string
-function extractParam(url: string, key: string): string | null {
-  // Fragment first (magic-link tokens land in the hash)
-  const hashIdx = url.indexOf('#')
-  const fragment = hashIdx !== -1 ? url.slice(hashIdx + 1) : ''
-  const queryIdx = url.indexOf('?')
-  const query = queryIdx !== -1 ? url.slice(queryIdx + 1, hashIdx !== -1 ? hashIdx : undefined) : ''
-
-  for (const part of [fragment, query]) {
-    const params = new URLSearchParams(part)
-    const val = params.get(key)
-    if (val) return val
-  }
-  return null
-}
-
-async function handleDeepLink(url: string): Promise<{ ok: boolean; error?: string }> {
-  const access_token = extractParam(url, 'access_token')
-  const refresh_token = extractParam(url, 'refresh_token')
-
-  if (!access_token || !refresh_token) {
-    return { ok: false, error: 'Invalid link — missing tokens.' }
-  }
-
-  const { error } = await supabase.auth.setSession({ access_token, refresh_token })
-  if (error) return { ok: false, error: error.message }
-  return { ok: true }
-}
-
 export default function CheckEmailScreen({ route, navigation }: Props) {
   const { email } = route.params
-  const [status, setStatus] = useState<'waiting' | 'processing' | 'error'>('waiting')
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  const processUrl = async (url: string | null) => {
-    if (!url) return
-    // Only handle auth-callback URLs
-    if (!url.includes('auth-callback')) return
-    setStatus('processing')
-    const result = await handleDeepLink(url)
-    if (!result.ok) {
-      setStatus('error')
-      setErrorMsg(result.error ?? 'Something went wrong.')
+  const [code,      setCode]      = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [error,     setError]     = useState<string | null>(null)
+  const [resending, setResending] = useState(false)
+  const [resent,    setResent]    = useState(false)
+
+  const handleVerify = async () => {
+    if (code.length !== 6) return
+    setLoading(true)
+    setError(null)
+
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: 'email',
+    })
+
+    setLoading(false)
+    if (verifyError) {
+      setError(verifyError.message)
+      setCode('')
     }
-    // On success, onAuthStateChange in useAuthStore fires and navigator switches stack
+    // On success onAuthStateChange in useAuthStore fires — navigator switches automatically
   }
 
-  useEffect(() => {
-    // Web: supabase.auth detectSessionInUrl:true handles token extraction
-    // automatically from the URL hash; onAuthStateChange in useAuthStore fires
-    // and the navigator switches — no manual Linking needed here.
-    if (Platform.OS === 'web') return
-
-    // Native: intercept the deep-link when the OS hands the URL to the app
-    Linking.getInitialURL().then(processUrl)
-    const sub = Linking.addEventListener('url', ({ url }) => processUrl(url))
-    return () => sub.remove()
-  }, [])
+  const handleResend = async () => {
+    setResending(true)
+    setError(null)
+    setResent(false)
+    await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
+    })
+    setResending(false)
+    setResent(true)
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
 
-        <View style={styles.iconWrap}>
-          <Text style={styles.icon}>✉️</Text>
-        </View>
-
-        <Text style={styles.title}>Check your inbox</Text>
-        <Text style={styles.subtitle}>
-          We sent a sign-in link to{'\n'}
-          <Text style={styles.emailHighlight}>{maskEmail(email)}</Text>
-        </Text>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            {Platform.OS === 'web' ? 'Click the link in your email' : 'Open the email and tap the link'}
-          </Text>
-          <Text style={styles.cardBody}>
-            {Platform.OS === 'web'
-              ? 'Click "Sign In to Souk" in the email — this browser tab will sign you in automatically.'
-              : 'Tap "Sign In to Souk" in the email — it will open directly in the app and log you in automatically.'}
-          </Text>
-        </View>
-
-        {status === 'processing' && (
-          <View style={styles.stateRow}>
-            <ActivityIndicator color="#C8622A" />
-            <Text style={styles.stateText}>Signing you in…</Text>
+          <View style={styles.iconWrap}>
+            <Text style={styles.icon}>✉️</Text>
           </View>
-        )}
 
-        {status === 'error' && errorMsg && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{errorMsg}</Text>
-            <TouchableOpacity onPress={() => { setStatus('waiting'); setErrorMsg(null) }} activeOpacity={0.7}>
-              <Text style={styles.retryText}>Try again</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          <Text style={styles.title}>Enter your code</Text>
+          <Text style={styles.subtitle}>
+            We sent a 6-digit code to{'\n'}
+            <Text style={styles.emailHighlight}>{maskEmail(email)}</Text>
+          </Text>
 
-        <TouchableOpacity
-          style={styles.resendBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.resendText}>Wrong email or didn't arrive? Go back</Text>
-        </TouchableOpacity>
-      </View>
+          <TextInput
+            style={styles.codeInput}
+            value={code}
+            onChangeText={(t) => {
+              setError(null)
+              setResent(false)
+              setCode(t.replace(/\D/g, '').slice(0, 6))
+            }}
+            keyboardType="number-pad"
+            maxLength={6}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleVerify}
+            placeholder="000000"
+            placeholderTextColor="#B0A090"
+            textAlign="center"
+          />
+
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {resent ? (
+            <Text style={styles.resentText}>New code sent!</Text>
+          ) : null}
+
+          <TouchableOpacity
+            style={[styles.button, (code.length !== 6 || loading) && styles.buttonMuted]}
+            onPress={handleVerify}
+            disabled={code.length !== 6 || loading}
+            activeOpacity={0.8}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FAF7F2" />
+            ) : (
+              <Text style={styles.buttonText}>Verify</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.resendBtn}
+            onPress={handleResend}
+            disabled={resending}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.resendText}>
+              {resending ? 'Sending…' : "Didn't receive a code? Resend"}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#FAF7F2' },
+  flex: { flex: 1 },
   container: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 40,
@@ -169,56 +178,59 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: '#7A6A5A',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
   },
   emailHighlight: { color: '#1C1612', fontWeight: '600' },
-  card: {
+  codeInput: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 32,
-    shadowColor: '#1C1612',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+    borderWidth: 1.5,
+    borderColor: '#D9CFC4',
+    borderRadius: 12,
+    paddingVertical: 20,
+    fontSize: 32,
+    fontWeight: '700',
     color: '#1C1612',
-    marginBottom: 8,
+    letterSpacing: 12,
+    minHeight: 72,
+    marginBottom: 16,
   },
-  cardBody: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: '#7A6A5A',
-  },
-  stateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginBottom: 24,
-  },
-  stateText: { fontSize: 15, color: '#7A6A5A' },
   errorBox: {
     backgroundColor: '#FDF0EC',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    alignItems: 'center',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   errorText: {
-    fontSize: 14,
     color: '#C8622A',
+    fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
-    marginBottom: 8,
   },
-  retryText: { fontSize: 14, color: '#C8622A', fontWeight: '600' },
+  resentText: {
+    fontSize: 13,
+    color: '#065F46',
+    textAlign: 'center',
+    marginBottom: 12,
+    fontWeight: '500',
+  },
+  button: {
+    backgroundColor: '#C8622A',
+    borderRadius: 12,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  buttonMuted: { opacity: 0.5 },
+  buttonText: {
+    color: '#FAF7F2',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
   resendBtn: {
-    marginTop: 'auto',
     alignItems: 'center',
     minHeight: 44,
     justifyContent: 'center',

@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native'
-import * as Linking from 'expo-linking'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
@@ -32,13 +31,9 @@ export default function PhoneLoginScreen({ navigation }: Props) {
     }
     setError(null)
     setLoading(true)
-    const redirectTo =
-      Platform.OS === 'web'
-        ? (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081')
-        : Linking.createURL('auth-callback')
     const { error: apiError } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: { shouldCreateUser: true, emailRedirectTo: redirectTo },
+      options: { shouldCreateUser: true },
     })
     setLoading(false)
     if (apiError) {
@@ -94,7 +89,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
             {loading ? (
               <ActivityIndicator color="#FAF7F2" />
             ) : (
-              <Text style={styles.buttonText}>Send Link</Text>
+              <Text style={styles.buttonText}>Send Code</Text>
             )}
           </TouchableOpacity>
         </ScrollView>

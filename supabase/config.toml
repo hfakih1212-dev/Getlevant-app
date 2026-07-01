@@ -274,9 +274,12 @@ max_frequency = "5s"
 # Force log out if the user has been inactive longer than the specified duration.
 # inactivity_timeout = "8h"
 
-[auth.hook.send_email]
-enabled = true
-uri = "http://host.docker.internal:54321/functions/v1/send-otp-email"
+# Hook is active on the remote project (configured via Management API).
+# Local dev uses inbucket — hook disabled here to avoid needing HMAC secret.
+# [auth.hook.send_email]
+# enabled = true
+# uri = "http://host.docker.internal:54321/functions/v1/send-otp-email"
+# secrets = "env(SEND_EMAIL_HOOK_SECRET)"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
 # [auth.hook.before_user_created]

@@ -10,6 +10,7 @@ interface AuthState {
   session: Session | null
   loading: boolean
   initialize: () => void
+  refreshUser: () => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -48,6 +49,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ session, user: null })
       }
     })
+  },
+
+  refreshUser: async () => {
+    const profile = await fetchOrCreateProfile()
+    set({ user: profile })
   },
 
   signOut: async () => {

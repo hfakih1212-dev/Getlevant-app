@@ -141,16 +141,18 @@ function InfoRow({ label, value, isLast }: InfoRowProps) {
 // ---------------------------------------------------------------------------
 
 export default function ProfileScreen() {
-  const navigation = useNavigation()
-  const user       = useAuthStore(s => s.user)
-  const signOut    = useAuthStore(s => s.signOut)
+  const navigation  = useNavigation()
+  const user        = useAuthStore(s => s.user)
+  const signOut     = useAuthStore(s => s.signOut)
+  const refreshUser = useAuthStore(s => s.refreshUser)
 
   // Fresh user row from DB (notification_prefs and push_token may have changed)
   const [prefs,       setPrefs]       = useState<NotifPrefs>(DEFAULT_PREFS)
   const [pushToken,   setPushToken]   = useState<string | null>(null)
   const [loading,     setLoading]     = useState(true)
   const [savingPref,  setSavingPref]  = useState<keyof NotifPrefs | null>(null)
-  const [registering, setRegistering] = useState(false)
+  const [registering,   setRegistering]   = useState(false)
+  const [becomingVendor, setBecomingVendor] = useState(false)
 
   // Phone number
   const [phoneInput,  setPhoneInput]  = useState('')
@@ -250,6 +252,33 @@ export default function ProfileScreen() {
 
     setRegistering(false)
   }, [user?.id])
+
+  // ---- Become a vendor ----
+
+  const handleBecomeVendor = useCallback(() => {
+    Alert.alert(
+      'Start Selling on Souk',
+      "You'll be taken to set up your store. Your account will switch to Vendor mode.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: async () => {
+            setBecomingVendor(true)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { error } = await (supabase.rpc as any)('become_vendor')
+            if (error) {
+              Alert.alert('Error', error.message)
+              setBecomingVendor(false)
+              return
+            }
+            await refreshUser()
+            // Navigator auto-switches to VendorStack once user.role === 'vendor'
+          },
+        },
+      ],
+    )
+  }, [refreshUser])
 
   // ---- Sign out ----
 
@@ -410,6 +439,35 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
           </SectionCard>
+
+          {/* ── Become a vendor (shoppers only) ── */}
+          {user?.role === 'shopper' && (
+            <>
+              <SectionLabel text="Sell on Souk" />
+              <SectionCard>
+                <View style={styles.vendorPromo}>
+                  <Text style={styles.vendorPromoTitle}>Become a Vendor</Text>
+                  <Text style={styles.vendorPromoHint}>
+                    List your products and reach shoppers across your region.
+                  </Text>
+                </View>
+                <View style={[styles.row, styles.rowSingle]}>
+                  <TouchableOpacity
+                    style={[styles.vendorBtn, becomingVendor && styles.vendorBtnDisabled]}
+                    onPress={handleBecomeVendor}
+                    disabled={becomingVendor}
+                    activeOpacity={0.8}
+                  >
+                    {becomingVendor ? (
+                      <ActivityIndicator size="small" color="#FAF7F2" />
+                    ) : (
+                      <Text style={styles.vendorBtnText}>Start Selling</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </SectionCard>
+            </>
+          )}
 
           {/* ── Sign out ── */}
           <SectionLabel text="Account" />
@@ -648,6 +706,38 @@ const styles = StyleSheet.create({
   phoneSaveBtnDisabled: { opacity: 0.38 },
   phoneSaveBtnText: {
     fontSize: 14,
+    fontWeight: '700',
+    color: '#FAF7F2',
+  },
+
+  // Become a vendor
+  vendorPromo: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 4,
+  },
+  vendorPromoTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1612',
+  },
+  vendorPromoHint: {
+    fontSize: 13,
+    color: '#7A6A5A',
+    lineHeight: 18,
+  },
+  vendorBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#C8622A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  vendorBtnDisabled: { opacity: 0.4 },
+  vendorBtnText: {
+    fontSize: 15,
     fontWeight: '700',
     color: '#FAF7F2',
   },

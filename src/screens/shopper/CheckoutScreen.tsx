@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   KeyboardAvoidingView,
@@ -61,10 +61,12 @@ export default function CheckoutScreen({ navigation }: Props) {
   const [landmark,      setLandmark]      = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
   const [placing,       setPlacing]       = useState(false)
+  const orderPlacedRef = useRef(false)
 
-  // Navigate back if bag is somehow empty (e.g. cleared externally)
+  // Navigate back if bag is somehow empty (e.g. cleared externally),
+  // but NOT after we just placed an order (clearCart fires mid-navigation).
   useEffect(() => {
-    if (items.length === 0) navigation.goBack()
+    if (items.length === 0 && !orderPlacedRef.current) navigation.goBack()
   }, [items.length])
 
   const subtotal = useMemo(
@@ -138,6 +140,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       if (itemsError) throw itemsError
 
       notifyNewOrder(order.id)
+      orderPlacedRef.current = true
       clearCart()
       navigation.navigate('OrderConfirmation', {
         orderNumber: order.order_number ?? '',

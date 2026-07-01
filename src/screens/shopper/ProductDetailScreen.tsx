@@ -159,6 +159,7 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
   const canOrder = !!(selectedVariant && selectedVariant.stock > 0)
 
   const addItem = useCartStore((s) => s.addItem)
+  const [added, setAdded] = useState(false)
 
   // ---- Handlers ----
 
@@ -187,7 +188,7 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
   )
 
   const handleAddToCart = useCallback(() => {
-    if (!selectedVariant || !product) return
+    if (!selectedVariant || !product || added) return
 
     addItem({
       productId: product.id,
@@ -202,8 +203,9 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
       colorHex: selectedVariant.color_hex,
     })
 
-    navigation.navigate('Cart')
-  }, [addItem, product, selectedVariant, store, images, navigation])
+    setAdded(true)
+    setTimeout(() => navigation.goBack(), 1200)
+  }, [addItem, product, selectedVariant, store, images, navigation, added])
 
   // ---- Loading / error guards ----
 
@@ -363,13 +365,13 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
       {/* ── Sticky action bar ── */}
       <View style={styles.actionBar}>
         <TouchableOpacity
-          style={[styles.orderBtn, !canOrder && styles.orderBtnMuted]}
+          style={[styles.orderBtn, (!canOrder || added) && styles.orderBtnMuted, added && styles.orderBtnAdded]}
           onPress={handleAddToCart}
-          disabled={!canOrder}
+          disabled={!canOrder || added}
           activeOpacity={0.85}
         >
           <Text style={styles.orderBtnText}>
-            {canOrder ? 'Add to Bag' : 'Select options'}
+            {added ? 'Added to Bag ✓' : canOrder ? 'Add to Bag' : 'Select options'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -562,6 +564,10 @@ const styles = StyleSheet.create({
   },
   orderBtnMuted: {
     opacity: 0.45,
+  },
+  orderBtnAdded: {
+    backgroundColor: '#2D7A4F',
+    opacity: 1,
   },
   orderBtnText: {
     fontSize: 16,

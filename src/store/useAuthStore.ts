@@ -13,6 +13,18 @@ interface AuthState {
   signOut: () => Promise<void>
 }
 
+async function fetchOrCreateProfile(): Promise<UserRow | null> {
+  const { data: existing } = await supabase
+    .from('users')
+    .select('*')
+    .maybeSingle()
+  if (existing) return existing
+  // Row missing (auth user pre-dates the trigger) — create it via security-definer RPC
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: created } = await (supabase.rpc as any)('ensure_my_profile')
+  return created as UserRow | null
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   session: null,
@@ -21,11 +33,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   initialize: () => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle()
+        const profile = await fetchOrCreateProfile()
         set({ session, user: profile, loading: false })
       } else {
         set({ session, loading: false })
@@ -34,11 +42,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle()
+        const profile = await fetchOrCreateProfile()
         set({ session, user: profile })
       } else {
         set({ session, user: null })

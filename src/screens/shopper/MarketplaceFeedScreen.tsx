@@ -47,6 +47,18 @@ const fetchFeed = () =>
 type FeedProduct = NonNullable<Awaited<ReturnType<typeof fetchFeed>>['data']>[0]
 
 // ---------------------------------------------------------------------------
+// Sort options
+// ---------------------------------------------------------------------------
+
+type SortOption = 'newest' | 'price_asc' | 'price_desc'
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'newest',     label: 'Newest'   },
+  { value: 'price_asc',  label: 'Price ↑'  },
+  { value: 'price_desc', label: 'Price ↓'  },
+]
+
+// ---------------------------------------------------------------------------
 // Region filter constants
 // ---------------------------------------------------------------------------
 
@@ -137,6 +149,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
   const [error,          setError]          = useState<string | null>(null)
   const [searchText,     setSearchText]     = useState('')
   const [selectedRegion, setSelectedRegion] = useState<LebanonRegion | null>(null)
+  const [sortBy,         setSortBy]         = useState<SortOption>('newest')
 
   // ---- Fetch ----
 
@@ -180,8 +193,15 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
       )
     }
 
+    if (sortBy === 'price_asc') {
+      result = [...result].sort((a, b) => Number(a.price_usd) - Number(b.price_usd))
+    } else if (sortBy === 'price_desc') {
+      result = [...result].sort((a, b) => Number(b.price_usd) - Number(a.price_usd))
+    }
+    // 'newest' keeps the server-returned order (created_at desc)
+
     return result
-  }, [products, searchText, selectedRegion])
+  }, [products, searchText, selectedRegion, sortBy])
 
   // ---- Handlers ----
 
@@ -219,7 +239,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
     )
   }
 
-  const isFiltering = searchText.trim().length > 0 || selectedRegion !== null
+  const isFiltering = searchText.trim().length > 0 || selectedRegion !== null || sortBy !== 'newest'
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -273,6 +293,25 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
             clearButtonMode="while-editing"
           />
         </View>
+      </View>
+
+      {/* ── Sort options ── */}
+      <View style={styles.sortRow}>
+        {SORT_OPTIONS.map(opt => {
+          const active = sortBy === opt.value
+          return (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.sortPill, active && styles.sortPillActive]}
+              onPress={() => setSortBy(opt.value)}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.sortPillText, active && styles.sortPillTextActive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          )
+        })}
       </View>
 
       {/* ── Region filter pills ── */}
@@ -329,7 +368,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
             {isFiltering && (
               <TouchableOpacity
                 style={styles.clearBtn}
-                onPress={() => { setSearchText(''); setSelectedRegion(null) }}
+                onPress={() => { setSearchText(''); setSelectedRegion(null); setSortBy('newest') }}
                 activeOpacity={0.8}
               >
                 <Text style={styles.clearBtnText}>Clear filters</Text>
@@ -451,6 +490,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1C1612',
     paddingVertical: 0,
+  },
+
+  // ── Sort row ──
+  sortRow: {
+    flexDirection: 'row',
+    paddingHorizontal: H_PAD,
+    paddingBottom: 10,
+    gap: 8,
+  },
+  sortPill: {
+    height: 32,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#D9CFC4',
+    backgroundColor: '#FAF7F2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sortPillActive: {
+    backgroundColor: '#1C1612',
+    borderColor: '#1C1612',
+  },
+  sortPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1C1612',
+  },
+  sortPillTextActive: {
+    color: '#FAF7F2',
   },
 
   // ── Region pill bar ──

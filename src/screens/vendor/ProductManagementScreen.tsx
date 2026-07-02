@@ -1,7 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -279,7 +278,7 @@ export default function ProductManagementScreen({ navigation }: Props) {
   const handlePickImage = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow access to your photo library to add product images.')
+      setFormError('Allow access to your photo library in Settings to add product images.')
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -335,18 +334,17 @@ export default function ProductManagementScreen({ navigation }: Props) {
   const handleSave = useCallback(async () => {
     setFormError(null)
 
-    // Validate — use Alert so errors are visible regardless of scroll position
     if (!name.trim()) {
-      Alert.alert('Missing field', 'Product name is required.')
+      setFormError('Product name is required.')
       return
     }
     const priceNum = parseFloat(price)
     if (isNaN(priceNum) || priceNum <= 0) {
-      Alert.alert('Invalid price', 'Enter a price greater than 0.')
+      setFormError('Enter a price greater than 0.')
       return
     }
     if (!storeId) {
-      Alert.alert('No store', 'Could not find your store. Try going back and reopening Inventory.')
+      setFormError('Could not find your store. Go back and reopen Inventory.')
       return
     }
 
@@ -355,7 +353,7 @@ export default function ProductManagementScreen({ navigation }: Props) {
       v => v.size.trim() || v.color.trim() || v.stock.trim(),
     )
     if (validVariants.length === 0) {
-      Alert.alert('No variant', 'Fill in at least one variant row — add a size, colour, or stock count.')
+      setFormError('Fill in at least one variant row — add a size, colour, or stock count.')
       return
     }
 
@@ -420,10 +418,7 @@ export default function ProductManagementScreen({ navigation }: Props) {
       setMode('list')
       resetForm()
     } catch (err: unknown) {
-      Alert.alert(
-        'Save Failed',
-        err instanceof Error ? err.message : 'Something went wrong.',
-      )
+      setFormError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {
       setSaving(false)
     }

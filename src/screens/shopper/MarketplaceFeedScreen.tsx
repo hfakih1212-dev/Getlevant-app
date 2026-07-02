@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Dimensions,
@@ -15,6 +15,7 @@ import {
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
@@ -36,13 +37,12 @@ const fetchFeed = () =>
       name,
       price_usd,
       stores!inner ( name, region ),
-      product_images!inner ( url, position ),
+      product_images ( url, position ),
       product_variants ( size, color, color_hex, stock )
     `,
     )
     .eq('status', 'active')
     .eq('stores.status', 'active')
-    .eq('product_images.position', 0)
     .order('created_at', { ascending: false })
 
 type FeedProduct = NonNullable<Awaited<ReturnType<typeof fetchFeed>>['data']>[0]
@@ -102,9 +102,8 @@ function resolveStore(stores: FeedProduct['stores']): { name: string; region: st
 type CardProps = { item: FeedProduct; onPress: (item: FeedProduct) => void }
 
 function ProductCard({ item, onPress }: CardProps) {
-  const coverUrl = Array.isArray(item.product_images)
-    ? item.product_images[0]?.url
-    : (item.product_images as { url: string } | null)?.url
+  const images = Array.isArray(item.product_images) ? item.product_images : []
+  const coverUrl = [...images].sort((a, b) => a.position - b.position)[0]?.url ?? null
 
   const store = resolveStore(item.stores)
   const price = `$${Number(item.price_usd).toFixed(0)}`
@@ -180,7 +179,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
     setRefreshing(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useFocusEffect(useCallback(() => { load() }, [load]))
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true)

@@ -12,7 +12,6 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { AuthError } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import { AuthStackParamList } from '../../navigation/RootNavigator'
 
@@ -21,7 +20,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'PhoneLogin'>
 export default function PhoneLoginScreen({ navigation }: Props) {
   const [email, setEmail]     = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState<AuthError | string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
 
   const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 
@@ -32,16 +31,18 @@ export default function PhoneLoginScreen({ navigation }: Props) {
     }
     setError(null)
     setLoading(true)
-    const { error: apiError } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { shouldCreateUser: true },
-    })
-    setLoading(false)
-    if (apiError) {
-      setError(apiError)
-      return
+    try {
+      const { error: apiError } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { shouldCreateUser: true },
+      })
+      if (apiError) throw apiError
+      navigation.navigate('CheckEmail', { email: email.trim() })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setLoading(false)
     }
-    navigation.navigate('CheckEmail', { email: email.trim() })
   }
 
   return (
@@ -78,7 +79,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
           {error ? (
             <View style={styles.errorBox}>
               <Text style={styles.errorText}>
-                {typeof error === 'string' ? error : error.message}
+                {error}
               </Text>
             </View>
           ) : null}

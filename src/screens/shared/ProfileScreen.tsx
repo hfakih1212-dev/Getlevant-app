@@ -152,7 +152,9 @@ export default function ProfileScreen() {
   const [loading,     setLoading]     = useState(true)
   const [savingPref,  setSavingPref]  = useState<keyof NotifPrefs | null>(null)
   const [registering,   setRegistering]   = useState(false)
-  const [becomingVendor, setBecomingVendor] = useState(false)
+  const [becomingVendor,   setBecomingVendor]   = useState(false)
+  const [confirmSignOut,   setConfirmSignOut]   = useState(false)
+  const [signingOut,       setSigningOut]       = useState(false)
 
   // Phone number
   const [phoneInput,  setPhoneInput]  = useState('')
@@ -282,12 +284,14 @@ export default function ProfileScreen() {
 
   // ---- Sign out ----
 
-  const handleSignOut = useCallback(() => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: signOut },
-    ])
-  }, [signOut])
+  const handleSignOut = useCallback(async () => {
+    if (!confirmSignOut) {
+      setConfirmSignOut(true)
+      return
+    }
+    setSigningOut(true)
+    await signOut()
+  }, [confirmSignOut, signOut])
 
   // ---- Avatar initial ----
 
@@ -472,13 +476,36 @@ export default function ProfileScreen() {
           {/* ── Sign out ── */}
           <SectionLabel text="Account" />
           <SectionCard>
-            <TouchableOpacity
-              style={styles.signOutBtn}
-              onPress={handleSignOut}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.signOutText}>Sign Out</Text>
-            </TouchableOpacity>
+            {confirmSignOut ? (
+              <View style={styles.signOutConfirmRow}>
+                <TouchableOpacity
+                  style={styles.signOutCancelBtn}
+                  onPress={() => setConfirmSignOut(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.signOutCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.signOutConfirmBtn}
+                  onPress={handleSignOut}
+                  disabled={signingOut}
+                  activeOpacity={0.8}
+                >
+                  {signingOut
+                    ? <ActivityIndicator size="small" color="#FAF7F2" />
+                    : <Text style={styles.signOutConfirmText}>Yes, sign out</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.signOutBtn}
+                onPress={handleSignOut}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.signOutText}>Sign Out</Text>
+              </TouchableOpacity>
+            )}
           </SectionCard>
 
           <View style={{ height: 32 }} />
@@ -752,5 +779,37 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#C8622A',
+  },
+  signOutConfirmRow: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 10,
+  },
+  signOutCancelBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#D9CFC4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  signOutCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7A6A5A',
+  },
+  signOutConfirmBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#C8622A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  signOutConfirmText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FAF7F2',
   },
 })

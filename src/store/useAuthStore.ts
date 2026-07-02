@@ -42,11 +42,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     })
 
     supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        set({ session: null, user: null })
+        return
+      }
       if (session?.user) {
         const profile = await fetchOrCreateProfile()
         set({ session, user: profile })
       } else {
-        set({ session, user: null })
+        set({ session: null, user: null })
       }
     })
   },
@@ -57,7 +61,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   signOut: async () => {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // Network errors shouldn't block local sign-out
+    }
     set({ user: null, session: null })
   },
 }))

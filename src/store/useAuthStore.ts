@@ -62,10 +62,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   signOut: async () => {
     try {
-      await supabase.auth.signOut()
+      // scope: 'local' clears SecureStore immediately without a network call,
+      // so the auto-refresh timer can't restore the session afterward.
+      await supabase.auth.signOut({ scope: 'local' })
     } catch {
-      // Network errors shouldn't block local sign-out
+      set({ user: null, session: null })
     }
-    set({ user: null, session: null })
   },
 }))

@@ -36,10 +36,20 @@ export default function PhoneLoginScreen({ navigation }: Props) {
         email: email.trim(),
         options: { shouldCreateUser: true },
       })
-      if (apiError) throw apiError
+      if (apiError) {
+        console.error('[Auth] signInWithOtp failed:', {
+          message: apiError.message,
+          status:  apiError.status,
+          code:    (apiError as any).code,
+        })
+        throw apiError
+      }
+      console.log('[Auth] OTP sent successfully to', email.trim())
       navigation.navigate('CheckEmail', { email: email.trim() })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      const msg = err instanceof Error ? err.message : 'Something went wrong.'
+      console.error('[Auth] catch block:', err)
+      setError(msg)
     } finally {
       setLoading(false)
     }

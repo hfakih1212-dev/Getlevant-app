@@ -46,6 +46,10 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ session: null, user: null })
         return
       }
+      // Ignore refresh events that race with an in-progress sign-out
+      const currentSession = useAuthStore.getState().session
+      if (!currentSession && event === 'TOKEN_REFRESHED') return
+
       if (session?.user) {
         const profile = await fetchOrCreateProfile()
         set({ session, user: profile })
@@ -61,12 +65,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   signOut: async () => {
-    try {
-      // scope: 'local' clears SecureStore immediately without a network call,
-      // so the auto-refresh timer can't restore the session afterward.
-      await supabase.auth.signOut({ scope: 'local' })
-    } catch {
-      set({ user: null, session: null })
-    }
+    // Clear state first so the UI reacts immediately.
+    set({ user: null, session: null })
+    // scope:'local' wipes SecureStore without a network round-trip,
+    // stopping the auto-refresh timer from restoring the session.
+    try { await supabase.auth.signOut({ scope: 'local' }) } catch { /* ignore */ }
   },
 }))

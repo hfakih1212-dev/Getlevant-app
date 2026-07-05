@@ -39,6 +39,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      favorites: {
+        Row: {
+          created_at: string | null
+          product_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          product_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          product_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string | null
@@ -97,6 +130,7 @@ export type Database = {
           delivery_address: string | null
           delivery_fee_usd: number
           delivery_region: string | null
+          discount_usd: number
           id: string
           notes: string | null
           order_number: string | null
@@ -108,6 +142,7 @@ export type Database = {
           subtotal_usd: number
           total_usd: number
           updated_at: string | null
+          voucher_code: string | null
           whatsapp_sent: boolean
         }
         Insert: {
@@ -115,6 +150,7 @@ export type Database = {
           delivery_address?: string | null
           delivery_fee_usd?: number
           delivery_region?: string | null
+          discount_usd?: number
           id?: string
           notes?: string | null
           order_number?: string | null
@@ -126,6 +162,7 @@ export type Database = {
           subtotal_usd: number
           total_usd: number
           updated_at?: string | null
+          voucher_code?: string | null
           whatsapp_sent?: boolean
         }
         Update: {
@@ -133,6 +170,7 @@ export type Database = {
           delivery_address?: string | null
           delivery_fee_usd?: number
           delivery_region?: string | null
+          discount_usd?: number
           id?: string
           notes?: string | null
           order_number?: string | null
@@ -144,6 +182,7 @@ export type Database = {
           subtotal_usd?: number
           total_usd?: number
           updated_at?: string | null
+          voucher_code?: string | null
           whatsapp_sent?: boolean
         }
         Relationships: [
@@ -463,6 +502,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          logo_url: string | null
           name: string
           owner_id: string
           rating: number | null
@@ -474,6 +514,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          logo_url?: string | null
           name: string
           owner_id: string
           rating?: number | null
@@ -485,6 +526,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          logo_url?: string | null
           name?: string
           owner_id?: string
           rating?: number | null
@@ -512,6 +554,7 @@ export type Database = {
           phone: string | null
           push_token: string | null
           referral_code: string | null
+          referred_by: string | null
           role: string
           store_id: string | null
         }
@@ -524,6 +567,7 @@ export type Database = {
           phone?: string | null
           push_token?: string | null
           referral_code?: string | null
+          referred_by?: string | null
           role?: string
           store_id?: string | null
         }
@@ -536,10 +580,19 @@ export type Database = {
           phone?: string | null
           push_token?: string | null
           referral_code?: string | null
+          referred_by?: string | null
           role?: string
           store_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -559,6 +612,7 @@ export type Database = {
           phone: string | null
           push_token: string | null
           referral_code: string | null
+          referred_by: string | null
           role: string
           store_id: string | null
         }
@@ -570,6 +624,7 @@ export type Database = {
         }
       }
       owns_store: { Args: { p_store_id: string }; Returns: boolean }
+      redeem_referral: { Args: { p_code: string }; Returns: undefined }
       vendor_analytics: { Args: never; Returns: Json }
     }
     Enums: {

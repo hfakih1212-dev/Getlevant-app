@@ -15,9 +15,12 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import ConditionBadge from '../../components/ConditionBadge'
 import { CATEGORY_LABEL } from '../../lib/catalog'
+import { useT } from '../../lib/i18n'
 import { productLink, shareLink } from '../../lib/share'
 import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../store/useAuthStore'
 import { useCartStore } from '../../store/useCartStore'
+import { useFavoritesStore } from '../../store/useFavoritesStore'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
 
 type Props = NativeStackScreenProps<ShopperStackParamList, 'ProductDetail'>
@@ -35,7 +38,7 @@ const fetchProduct = (id: string) =>
     .select(
       `
       id, name, description, price_usd, store_id, category, condition,
-      stores ( name, description, region, whatsapp, rating ),
+      stores ( name, description, region, whatsapp, rating, logo_url ),
       product_images ( id, url, position ),
       product_variants ( id, size, color, color_hex, stock )
     `,
@@ -51,6 +54,7 @@ type StoreShape = {
   region: string | null
   whatsapp: string | null
   rating: number | null
+  logo_url: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +64,7 @@ type StoreShape = {
 export default function ProductDetailScreen({ route, navigation }: Props) {
   const { productId } = route.params
   const insets = useSafeAreaInsets()
+  const t = useT()
 
   const [product, setProduct] = useState<ProductDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -171,6 +176,18 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
   const [added, setAdded] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
 
+  const user      = useAuthStore(s => s.user)
+  const favorite  = useFavoritesStore(s => s.ids.has(productId))
+  const toggleFav = useFavoritesStore(s => s.toggle)
+
+  const handleToggleFav = useCallback(() => {
+    if (!user?.id) {
+      navigation.navigate('Login')
+      return
+    }
+    void toggleFav(user.id, productId)
+  }, [user?.id, toggleFav, productId, navigation])
+
   // ---- Handlers ----
 
   const handleScrollEnd = useCallback(
@@ -243,7 +260,7 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
   if (error || !product) {
     return (
       <SafeAreaView style={[styles.safe, styles.centered]}>
-        <Text style={styles.errorText}>{error ?? 'Product not found.'}</Text>
+        <Text style={styles.errorText}>{error ?? t('product.notFound')}</Text>
       </SafeAreaView>
     )
   }
@@ -298,9 +315,22 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
               <Text style={styles.shareBtnText}>↗</Text>
             </View>
           </TouchableOpacity>
+
+          {/* Favorite heart — inboard of the share button */}
+          <TouchableOpacity
+            style={[styles.favBtn, { top: insets.top + 8 }]}
+            onPress={handleToggleFav}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View style={styles.backBtnInner}>
+              <Text style={favorite ? styles.favFilled : styles.favEmpty}>
+                {favorite ? '♥' : '♡'}
+              </Text>
+            </View>
+          </TouchableOpacity>
           {linkCopied && (
             <View style={[styles.copiedToast, { top: insets.top + 56 }]}>
-              <Text style={styles.copiedToastText}>Link copied</Text>
+              <Text style={styles.copiedToastText}>{t('product.linkCopied')}</Text>
             </View>
           )}
 
@@ -338,7 +368,7 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
           {/* ── Size picker ── */}
           {sizes.length > 0 && (
             <View style={styles.pickerSection}>
-              <Text style={styles.pickerLabel}>Size</Text>
+              <Text style={styles.pickerLabel}>{t('product.size')}</Text>
               <View style={styles.pillRow}>
                 {sizes.map(size => {
                   const available = isSizeAvailable(size)
@@ -374,7 +404,7 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
           {colors.length > 0 && (
             <View style={styles.pickerSection}>
               <Text style={styles.pickerLabel}>
-                {selectedColor ? `Color — ${selectedColor}` : 'Color'}
+                {selectedColor ? t('product.colorNamed', { name: selectedColor }) : t('product.color')}
               </Text>
               <View style={styles.swatchRow}>
                 {colors.map(({ color, color_hex }) => {
@@ -411,13 +441,17 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
               onPress={() => navigation.navigate('StoreProfile', { storeId: product.store_id })}
               activeOpacity={0.85}
             >
-              <View style={styles.storeAvatar}>
-                <Text style={styles.storeAvatarText}>{store.name.charAt(0).toUpperCase()}</Text>
-              </View>
+              {store.logo_url ? (
+                <Image source={{ uri: store.logo_url }} style={styles.storeAvatarImg} resizeMode="cover" />
+              ) : (
+                <View style={styles.storeAvatar}>
+                  <Text style={styles.storeAvatarText}>{store.name.charAt(0).toUpperCase()}</Text>
+                </View>
+              )}
               <View style={styles.storeCardBody}>
                 <Text style={styles.storeCardName} numberOfLines={1}>{store.name}</Text>
                 <Text style={styles.storeCardMeta} numberOfLines={1}>
-                  {store.rating != null ? `★ ${store.rating.toFixed(1)}` : '★ New'}
+                  {store.rating != null ? `★ ${store.rating.toFixed(1)}` : t('product.newStore')}
                   {store.region ? `  ·  ${store.region}` : ''}
                 </Text>
                 {store.description ? (
@@ -425,7 +459,7 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
                 ) : null}
               </View>
               <View style={styles.storeCardCta}>
-                <Text style={styles.storeCardCtaText}>Visit ›</Text>
+                <Text style={styles.storeCardCtaText}>{t('feed.visit')}</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -443,7 +477,7 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
           activeOpacity={0.85}
         >
           <Text style={styles.orderBtnText}>
-            {added ? 'Added to Bag ✓' : canOrder ? 'Add to Bag' : 'Select options'}
+            {added ? t('product.addedToBag') : canOrder ? t('product.addToBag') : t('product.selectOptions')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -493,6 +527,20 @@ const styles = StyleSheet.create({
   shareBtn: {
     position: 'absolute',
     right: 16,
+  },
+  favBtn: {
+    position: 'absolute',
+    right: 64,
+  },
+  favFilled: {
+    fontSize: 18,
+    color: '#D9552B',
+    lineHeight: 22,
+  },
+  favEmpty: {
+    fontSize: 18,
+    color: '#1C1612',
+    lineHeight: 22,
   },
   shareBtnText: {
     fontSize: 18,
@@ -675,6 +723,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  storeAvatarImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F0E9DF',
   },
   storeCardBody: {
     flex: 1,

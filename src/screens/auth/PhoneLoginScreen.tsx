@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { useT } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
 
@@ -24,6 +25,7 @@ function maskEmail(email: string): string {
 }
 
 export default function PhoneLoginScreen({ navigation }: Props) {
+  const t = useT()
   const [email,      setEmail]      = useState('')
   const [otpCode,    setOtpCode]    = useState('')
   const [isCodeSent, setIsCodeSent] = useState(false)
@@ -39,7 +41,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 
   const handleSendCode = async () => {
-    if (!emailValid) { setError('Enter a valid email address.'); return }
+    if (!emailValid) { setError(t('login.invalidEmail')); return }
     setError(null)
     setLoading(true)
     try {
@@ -51,7 +53,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
       setIsCodeSent(true)
       setTimeout(() => codeInputRef.current?.focus(), 100)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Try again.')
+      setError(err instanceof Error ? err.message : t('login.genericError'))
     } finally {
       setLoading(false)
     }
@@ -73,7 +75,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
       if (navigation.canGoBack()) navigation.goBack()
       else navigation.replace('MarketplaceFeed')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid code. Try again.')
+      setError(err instanceof Error ? err.message : t('login.invalidCode'))
       setOtpCode('')
     } finally {
       setLoading(false)
@@ -94,7 +96,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
       setResent(true)
       setTimeout(() => codeInputRef.current?.focus(), 100)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not resend. Try again.')
+      setError(err instanceof Error ? err.message : t('login.genericError'))
     } finally {
       setResending(false)
     }
@@ -128,12 +130,12 @@ export default function PhoneLoginScreen({ navigation }: Props) {
           )}
           <View style={styles.header}>
             <Text style={styles.title}>
-              {isCodeSent ? 'Enter your code' : 'Welcome to Souk'}
+              {isCodeSent ? t('login.enterCode') : t('login.welcome')}
             </Text>
             <Text style={styles.subtitle}>
               {isCodeSent
-                ? `We sent a 6-digit code to\n`
-                : 'Enter your email to sign in or create an account.'}
+                ? t('login.sentCode')
+                : t('login.subtitle')}
               {isCodeSent && (
                 <Text style={styles.emailHighlight}>{maskEmail(email)}</Text>
               )}
@@ -189,7 +191,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
           ) : null}
 
           {resent ? (
-            <Text style={styles.resentText}>New code sent!</Text>
+            <Text style={styles.resentText}>{t('login.newCodeSent')}</Text>
           ) : null}
 
           {/* Primary action button */}
@@ -202,7 +204,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
             >
               {loading
                 ? <ActivityIndicator color="#FFFFFF" />
-                : <Text style={styles.buttonText}>Send Code</Text>
+                : <Text style={styles.buttonText}>{t('login.sendCode')}</Text>
               }
             </TouchableOpacity>
           ) : (
@@ -214,7 +216,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
             >
               {loading
                 ? <ActivityIndicator color="#FFFFFF" />
-                : <Text style={styles.buttonText}>Confirm Code</Text>
+                : <Text style={styles.buttonText}>{t('login.confirmCode')}</Text>
               }
             </TouchableOpacity>
           )}
@@ -229,7 +231,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
                 style={styles.secondaryBtn}
               >
                 <Text style={styles.secondaryText}>
-                  {resending ? 'Sending…' : 'Resend code'}
+                  {resending ? t('login.resending') : t('login.resend')}
                 </Text>
               </TouchableOpacity>
 
@@ -240,7 +242,7 @@ export default function PhoneLoginScreen({ navigation }: Props) {
                 activeOpacity={0.7}
                 style={styles.secondaryBtn}
               >
-                <Text style={styles.secondaryText}>Change email</Text>
+                <Text style={styles.secondaryText}>{t('login.changeEmail')}</Text>
               </TouchableOpacity>
             </View>
           )}

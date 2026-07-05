@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.soukapp",
+      "bundleIdentifier": "com.souklb.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -22,7 +22,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.soukapp"
+      "package": "com.souklb.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,7 +30,8 @@
     "plugins": [
       "expo-secure-store",
       "expo-image",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-localization"
     ],
     "extra": {
       "eas": {

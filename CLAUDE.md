@@ -112,12 +112,30 @@ npx supabase secrets set KEY=value --project-ref fhsnjdwciwzpkzwvcbrl
 - Never skip `--no-verify` on hooks
 - Always include `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` in commits
 
+## Web Deployment
+- Production web app: **https://souk-app.expo.app** (EAS Hosting)
+- Deploy: `npx expo export --platform web && npx eas-cli deploy --prod --non-interactive`
+- Share links (`src/lib/share.ts` WEB_BASE_URL) and deep-link prefixes point at this domain
+
 ## Pending / Known Issues
 - WhatsApp notifications deployed but `WHATSAPP_API_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` secrets not set
-- Branch is ahead of `origin/main` — needs push
-- Push notifications: pipeline is live (`push-notify` Edge Function + token registration in
-  ProfileScreen) but requires a fresh EAS dev build — `expo-notifications` added a native module
-- No referral redemption flow yet — codes exist on users but nothing consumes them at checkout
+- Push notifications require a fresh dev build under the NEW app id `com.souklb.app`
+  (bundle ids changed from com.anonymous.soukapp on 2026-07-05 — old installs are a separate app)
+- i18n: EN/AR/FR cover the shopper funnel (feed, product, cart, login, checkout) via
+  `src/lib/i18n.ts`; vendor screens, profile bulk, payment-method labels, and a proper
+  RTL layout pass (I18nManager) are follow-ups
+- Referral payoff mints vouchers on first *delivered* order (milestone 0 = referral reward)
+
+## Recently shipped (2026-07-05, second batch)
+- Web app deployed to EAS Hosting; share links are real public URLs
+- Voucher redemption at checkout — server-authoritative via orders_apply_voucher trigger;
+  referral code entry for first-time buyers (redeem_referral RPC + users.referred_by)
+- Favorites: hearts on feed/product cards, Saved screen (`/saved`), useFavoritesStore
+- Store logos: upload in StoreSettings (product-images bucket, `<store_id>/logo-*`),
+  shown on store profile, product store card, featured-boutique rail
+- Editorial feed rails: Featured boutique, New this week, Thrifted picks
+- Rating stars on feed cards; i18n foundation with language picker in Profile
+- eas.json preview/production profiles fleshed out
 
 ## Recently shipped (2026-07-05)
 - Guest browsing: unauthenticated users get ShopperStack (feed/product/store/cart);

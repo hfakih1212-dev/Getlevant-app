@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
@@ -61,7 +62,12 @@ export default function StoreSettingsScreen({ navigation }: Props) {
 
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
+  const [saved,   setSaved]   = useState(false)
   const [error,   setError]   = useState<string | null>(null)
+
+  const [logoUrl,       setLogoUrl]       = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoError,     setLogoError]     = useState<string | null>(null)
 
   const normalizedPhone = normalizePhone(whatsapp)
 
@@ -74,7 +80,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
     async function load() {
       const { data, error: fetchErr } = await supabase
         .from('stores')
-        .select('id, name, description, whatsapp, region')
+        .select('id, name, description, whatsapp, region, logo_url')
         .eq('owner_id', user!.id)
         .maybeSingle()
 
@@ -92,6 +98,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
         setDescription(data.description ?? '')
         setWhatsapp(data.whatsapp ?? '')
         setRegion((data.region as LebanonRegion) ?? null)
+        setLogoUrl(data.logo_url)
       }
 
       setLoading(false)
@@ -123,13 +130,63 @@ export default function StoreSettingsScreen({ navigation }: Props) {
     if (updateErr) {
       setError(updateErr.message)
     } else {
-      Alert.alert('Saved', 'Store settings updated successfully.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ])
+      setSaved(true)
+      setTimeout(() => navigation.goBack(), 900)
     }
 
     setSaving(false)
   }, [storeId, canSave, name, description, normalizedPhone, region, navigation])
+
+  // ---- Logo upload — stored beside product photos under the store's folder ----
+
+  const handlePickLogo = useCallback(async () => {
+    if (!storeId || logoUploading) return
+    setLogoError(null)
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') {
+      setLogoError('Allow photo library access in Settings to upload a logo.')
+      return
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    })
+    if (result.canceled || result.assets.length === 0) return
+
+    setLogoUploading(true)
+    try {
+      const uri  = result.assets[0].uri
+      const ext  = uri.split('.').pop()?.toLowerCase() ?? 'jpg'
+      const path = `${storeId}/logo-${Date.now()}.${ext}`
+
+      const response = await fetch(uri)
+      const blob     = await response.blob()
+      const { error: uploadErr } = await supabase.storage
+        .from('product-images')
+        .upload(path, blob, { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` })
+      if (uploadErr) throw uploadErr
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(path)
+
+      const { error: updateErr } = await supabase
+        .from('stores')
+        .update({ logo_url: publicUrl })
+        .eq('id', storeId)
+      if (updateErr) throw updateErr
+
+      setLogoUrl(publicUrl)
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : 'Upload failed. Try again.')
+    } finally {
+      setLogoUploading(false)
+    }
+  }, [storeId, logoUploading])
 
   // ---- Render ----
 
@@ -177,6 +234,42 @@ export default function StoreSettingsScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* ── Logo ── */}
+          <Text style={styles.sectionLabel}>STORE LOGO</Text>
+          <View style={styles.card}>
+            <View style={styles.logoRow}>
+              {logoUrl ? (
+                <Image source={{ uri: logoUrl }} style={styles.logoPreview} resizeMode="cover" />
+              ) : (
+                <View style={styles.logoFallback}>
+                  <Text style={styles.logoFallbackText}>
+                    {name.trim().charAt(0).toUpperCase() || '?'}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.logoBody}>
+                <Text style={styles.fieldHint}>
+                  Shown on your storefront and product pages. Square images look best.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.logoBtn, logoUploading && styles.logoBtnDisabled]}
+                  onPress={handlePickLogo}
+                  disabled={logoUploading}
+                  activeOpacity={0.8}
+                >
+                  {logoUploading ? (
+                    <ActivityIndicator size="small" color="#D9552B" />
+                  ) : (
+                    <Text style={styles.logoBtnText}>
+                      {logoUrl ? 'Change Logo' : 'Upload Logo'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+            {logoError ? <Text style={styles.errorText}>{logoError}</Text> : null}
+          </View>
+
           {/* ── Store Details ── */}
           <Text style={styles.sectionLabel}>STORE DETAILS</Text>
           <View style={styles.card}>
@@ -268,15 +361,15 @@ export default function StoreSettingsScreen({ navigation }: Props) {
         {/* ── Sticky save ── */}
         <View style={styles.bottomBar}>
           <TouchableOpacity
-            style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
+            style={[styles.saveBtn, !canSave && styles.saveBtnDisabled, saved && styles.saveBtnSaved]}
             onPress={handleSave}
-            disabled={!canSave}
+            disabled={!canSave || saved}
             activeOpacity={0.85}
           >
             {saving ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={styles.saveBtnText}>Save Changes</Text>
+              <Text style={styles.saveBtnText}>{saved ? 'Saved ✓' : 'Save Changes'}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -450,6 +543,53 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveBtnDisabled: { opacity: 0.38 },
+  saveBtnSaved:    { backgroundColor: '#2D7A4F', opacity: 1 },
+
+  // Logo
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  logoPreview: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#F0E9DF',
+  },
+  logoFallback: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#1C1612',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoFallbackText: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  logoBody: {
+    flex: 1,
+    gap: 8,
+  },
+  logoBtn: {
+    alignSelf: 'flex-start',
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#D9552B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoBtnDisabled: { opacity: 0.5 },
+  logoBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#D9552B',
+  },
   saveBtnText: {
     fontSize: 16,
     fontWeight: '700',

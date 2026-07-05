@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Alert,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { useT } from '../../lib/i18n'
 import { LEBANON_REGIONS, LebanonRegion } from '../../lib/catalog'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
@@ -27,6 +28,12 @@ type PaymentMethod = Database['public']['Enums']['payment_method']
 // ---------------------------------------------------------------------------
 // Payment method options
 // ---------------------------------------------------------------------------
+
+interface Voucher {
+  id: string
+  code: string
+  discount_pct: number
+}
 
 const PAYMENT_OPTIONS: {
   value: PaymentMethod
@@ -55,6 +62,7 @@ const PAYMENT_OPTIONS: {
 // ---------------------------------------------------------------------------
 
 export default function CheckoutScreen({ navigation }: Props) {
+  const t = useT()
   const user      = useAuthStore((s) => s.user)
   const items     = useCartStore((s) => s.items)
   const clearCart = useCartStore((s) => s.clearCart)
@@ -64,7 +72,62 @@ export default function CheckoutScreen({ navigation }: Props) {
   const [region,        setRegion]        = useState<LebanonRegion | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
   const [placing,       setPlacing]       = useState(false)
+  const [orderError,    setOrderError]    = useState<string | null>(null)
   const orderPlacedRef = useRef(false)
+
+  // Vouchers — active rewards selectable as one-tap discounts
+  const [vouchers,        setVouchers]        = useState<Voucher[]>([])
+  const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
+
+  // Referral — first-time buyers can enter a friend's code
+  const [showReferral,    setShowReferral]    = useState(false)
+  const [referralInput,   setReferralInput]   = useState('')
+  const [referralApplied, setReferralApplied] = useState(false)
+  const [referralBusy,    setReferralBusy]    = useState(false)
+  const [referralError,   setReferralError]   = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!user?.id) return
+    let cancelled = false
+    async function loadPerks() {
+      const [rewardsRes, userRes] = await Promise.all([
+        supabase
+          .from('rewards')
+          .select('id, code, discount_pct')
+          .eq('user_id', user!.id)
+          .eq('status', 'active')
+          .order('discount_pct', { ascending: false }),
+        supabase
+          .from('users')
+          .select('completed_orders_count, referred_by')
+          .eq('id', user!.id)
+          .maybeSingle(),
+      ])
+      if (cancelled) return
+      setVouchers(rewardsRes.data ?? [])
+      // Referral entry only makes sense before the first completed order
+      setShowReferral(
+        userRes.data?.completed_orders_count === 0 && userRes.data?.referred_by === null,
+      )
+    }
+    loadPerks()
+    return () => { cancelled = true }
+  }, [user?.id])
+
+  const handleApplyReferral = useCallback(async () => {
+    const code = referralInput.trim()
+    if (!code || referralBusy) return
+    setReferralBusy(true)
+    setReferralError(null)
+    const { error } = await supabase.rpc('redeem_referral', { p_code: code })
+    if (error) {
+      setReferralError(error.message)
+    } else {
+      setReferralApplied(true)
+      setShowReferral(false)
+    }
+    setReferralBusy(false)
+  }, [referralInput, referralBusy])
 
   // Navigate back if bag is somehow empty (e.g. cleared externally),
   // but NOT after we just placed an order (clearCart fires mid-navigation).
@@ -76,6 +139,12 @@ export default function CheckoutScreen({ navigation }: Props) {
     () => items.reduce((sum, i) => sum + i.priceUsd * i.quantity, 0),
     [items],
   )
+
+  // Preview only — the orders_apply_voucher trigger does the authoritative math
+  const discount = selectedVoucher
+    ? Math.round(subtotal * selectedVoucher.discount_pct) / 100
+    : 0
+  const total = subtotal - discount
 
   const canPlace =
     street.trim().length > 0 &&
@@ -98,18 +167,19 @@ export default function CheckoutScreen({ navigation }: Props) {
     // Single-store constraint: one order = one store
     const storeIds = new Set(items.map((i) => i.storeId))
     if (storeIds.size > 1) {
-      Alert.alert(
-        'Multiple Stores',
+      setOrderError(
         'Your bag contains items from different stores. Please keep items from one store per order.',
       )
       return
     }
 
     setPlacing(true)
+    setOrderError(null)
 
     try {
-      // Step A — insert the order header
-      const { data: order, error: orderError } = await supabase
+      // Step A — insert the order header; the voucher trigger recomputes
+      // discount_usd and total_usd server-side and burns the voucher
+      const { data: order, error: insertError } = await supabase
         .from('orders')
         .insert({
           shopper_id:       user.id,
@@ -119,7 +189,8 @@ export default function CheckoutScreen({ navigation }: Props) {
           payment_status:   'pending',
           subtotal_usd:     subtotal,
           delivery_fee_usd: 0,
-          total_usd:        subtotal,
+          total_usd:        total,
+          voucher_code:     selectedVoucher?.code ?? null,
           delivery_address: buildAddress(),
           delivery_region:  region,
           whatsapp_sent:    false,
@@ -127,7 +198,7 @@ export default function CheckoutScreen({ navigation }: Props) {
         .select('id, order_number')
         .single()
 
-      if (orderError) throw orderError
+      if (insertError) throw insertError
 
       // Step B — insert line items, snapshotting the current unit price
       const { error: itemsError } = await supabase
@@ -160,15 +231,14 @@ export default function CheckoutScreen({ navigation }: Props) {
         /out.of.stock/i.test(msg) ||
         /insufficient.stock/i.test(msg)
 
-      Alert.alert(
-        isStockError ? 'Out of Stock' : 'Order Failed',
+      setOrderError(
         isStockError
-          ? 'One or more items in your bag are out of stock. Please review your cart and try again.'
+          ? t('checkout.outOfStock')
           : msg,
       )
       setPlacing(false)
     }
-  }, [canPlace, user, items, paymentMethod, region, subtotal, buildAddress, clearCart, navigation])
+  }, [canPlace, user, items, paymentMethod, region, subtotal, total, selectedVoucher, buildAddress, clearCart, navigation])
 
   // ---- Render ----
 
@@ -187,7 +257,7 @@ export default function CheckoutScreen({ navigation }: Props) {
           >
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Checkout</Text>
+          <Text style={styles.headerTitle}>{t('checkout.title')}</Text>
           <View style={styles.headerRight} />
         </View>
 
@@ -199,7 +269,7 @@ export default function CheckoutScreen({ navigation }: Props) {
         >
           {/* ── Order Summary ── */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Order Summary</Text>
+            <Text style={styles.sectionTitle}>{t('checkout.orderSummary')}</Text>
 
             {items.map((item) => {
               const variant = [item.size, item.color].filter(Boolean).join(' · ')
@@ -226,16 +296,16 @@ export default function CheckoutScreen({ navigation }: Props) {
             <View style={styles.divider} />
 
             <View style={styles.summaryRow}>
-              <Text style={styles.subtotalLabel}>Subtotal</Text>
+              <Text style={styles.subtotalLabel}>{t('checkout.subtotal')}</Text>
               <Text style={styles.subtotalValue}>${subtotal.toFixed(2)} USD</Text>
             </View>
           </View>
 
           {/* ── Delivery Details ── */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Delivery Details</Text>
+            <Text style={styles.sectionTitle}>{t('checkout.deliveryDetails')}</Text>
 
-            <Text style={styles.inputLabel}>Region</Text>
+            <Text style={styles.inputLabel}>{t('checkout.region')}</Text>
             <View style={styles.regionRow}>
               {LEBANON_REGIONS.map(r => {
                 const selected = region === r
@@ -254,12 +324,12 @@ export default function CheckoutScreen({ navigation }: Props) {
               })}
             </View>
 
-            <Text style={styles.inputLabel}>Street / Area</Text>
+            <Text style={styles.inputLabel}>{t('checkout.street')}</Text>
             <TextInput
               style={[styles.input, styles.inputMultiline]}
               value={street}
               onChangeText={setStreet}
-              placeholder="Building name, floor, street name, and neighbourhood"
+              placeholder={t('checkout.streetPlaceholder')}
               placeholderTextColor="#B0A090"
               multiline
               numberOfLines={3}
@@ -268,25 +338,25 @@ export default function CheckoutScreen({ navigation }: Props) {
             />
 
             <Text style={styles.inputLabel}>
-              Landmark{' '}
-              <Text style={styles.inputLabelAccent}>(critical for local couriers)</Text>
+              {t('checkout.landmark')}{' '}
+              <Text style={styles.inputLabelAccent}>{t('checkout.landmarkCritical')}</Text>
             </Text>
             <TextInput
               style={styles.input}
               value={landmark}
               onChangeText={setLandmark}
-              placeholder="e.g. opposite the blue mosque, next to ABC pharmacy"
+              placeholder={t('checkout.landmarkPlaceholder')}
               placeholderTextColor="#B0A090"
               returnKeyType="done"
             />
             <Text style={styles.inputHint}>
-              A precise landmark greatly speeds up delivery and reduces missed drops.
+              {t('checkout.landmarkHint')}
             </Text>
           </View>
 
           {/* ── Payment Method ── */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Payment Method</Text>
+            <Text style={styles.sectionTitle}>{t('checkout.payment')}</Text>
 
             {PAYMENT_OPTIONS.map((opt) => {
               const isSelected = paymentMethod === opt.value
@@ -330,14 +400,93 @@ export default function CheckoutScreen({ navigation }: Props) {
               )
             })}
           </View>
+
+          {/* ── Vouchers & referral ── */}
+          {(vouchers.length > 0 || showReferral || referralApplied) && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('checkout.discounts')}</Text>
+
+              {vouchers.map(v => {
+                const selected = selectedVoucher?.id === v.id
+                return (
+                  <TouchableOpacity
+                    key={v.id}
+                    style={[styles.voucherRow, selected && styles.voucherRowSelected]}
+                    onPress={() => setSelectedVoucher(selected ? null : v)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.voucherBody}>
+                      <Text style={styles.voucherCode}>{v.code}</Text>
+                      <Text style={styles.voucherPct}>{t('checkout.voucherOff', { pct: v.discount_pct })}</Text>
+                    </View>
+                    <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                      {selected && <View style={styles.radioInner} />}
+                    </View>
+                  </TouchableOpacity>
+                )
+              })}
+
+              {showReferral && (
+                <View style={styles.referralBlock}>
+                  <Text style={styles.inputLabel}>
+                    {t('checkout.referralQuestion')}{' '}
+                    <Text style={styles.inputLabelAccent}>{t('checkout.referralFirstOrder')}</Text>
+                  </Text>
+                  <View style={styles.referralRow}>
+                    <TextInput
+                      style={[styles.input, styles.referralInput]}
+                      value={referralInput}
+                      onChangeText={t => { setReferralError(null); setReferralInput(t.toUpperCase()) }}
+                      placeholder="e.g. 3F9A21BC"
+                      placeholderTextColor="#B0A090"
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                    />
+                    <TouchableOpacity
+                      style={[styles.referralBtn, (!referralInput.trim() || referralBusy) && styles.referralBtnDisabled]}
+                      onPress={handleApplyReferral}
+                      disabled={!referralInput.trim() || referralBusy}
+                      activeOpacity={0.8}
+                    >
+                      {referralBusy
+                        ? <ActivityIndicator size="small" color="#FFFFFF" />
+                        : <Text style={styles.referralBtnText}>{t('checkout.apply')}</Text>
+                      }
+                    </TouchableOpacity>
+                  </View>
+                  {referralError ? (
+                    <Text style={styles.referralError}>{referralError}</Text>
+                  ) : null}
+                  <Text style={styles.inputHint}>
+                    {t('checkout.referralHint')}
+                  </Text>
+                </View>
+              )}
+
+              {referralApplied && (
+                <Text style={styles.referralSuccess}>
+                  {t('checkout.referralApplied')}
+                </Text>
+              )}
+            </View>
+          )}
         </ScrollView>
 
         {/* ── Sticky bottom bar ── */}
         <View style={styles.bottomBar}>
+          {selectedVoucher && (
+            <View style={styles.totalRow}>
+              <Text style={styles.discountLabel}>{t('checkout.voucher')} {selectedVoucher.code}</Text>
+              <Text style={styles.discountValue}>−${discount.toFixed(2)}</Text>
+            </View>
+          )}
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>${subtotal.toFixed(2)} USD</Text>
+            <Text style={styles.totalLabel}>{t('checkout.total')}</Text>
+            <Text style={styles.totalValue}>${total.toFixed(2)} USD</Text>
           </View>
+          {orderError ? (
+            <Text style={styles.orderError}>{orderError}</Text>
+          ) : null}
           <TouchableOpacity
             style={[styles.placeBtn, !canPlace && styles.placeBtnDisabled]}
             onPress={handlePlaceOrder}
@@ -345,7 +494,7 @@ export default function CheckoutScreen({ navigation }: Props) {
             activeOpacity={0.85}
           >
             <Text style={styles.placeBtnText}>
-              {placing ? 'Placing Order…' : 'Place Order'}
+              {placing ? t('checkout.placing') : t('checkout.placeOrder')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -540,6 +689,82 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#D9552B',
   },
+  // Vouchers & referral
+  voucherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#ECE6DC',
+    backgroundColor: '#FFFFFF',
+  },
+  voucherRowSelected: {
+    borderColor: '#D9552B',
+    backgroundColor: '#FFF8F4',
+  },
+  voucherBody: { flex: 1 },
+  voucherCode: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1612',
+    letterSpacing: 1,
+    fontVariant: ['tabular-nums'],
+  },
+  voucherPct: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#D9552B',
+    marginTop: 2,
+  },
+  referralBlock: {
+    gap: 8,
+    paddingTop: 4,
+  },
+  referralRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  referralInput: {
+    flex: 1,
+    letterSpacing: 1.5,
+  },
+  referralBtn: {
+    height: 48,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: '#1C1612',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  referralBtnDisabled: { opacity: 0.4 },
+  referralBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  referralError: {
+    fontSize: 12,
+    color: '#D9552B',
+    lineHeight: 17,
+  },
+  referralSuccess: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2D7A4F',
+    lineHeight: 18,
+  },
+  discountLabel: { fontSize: 13, fontWeight: '600', color: '#2D7A4F' },
+  discountValue: { fontSize: 14, fontWeight: '700', color: '#2D7A4F' },
+  orderError: {
+    fontSize: 13,
+    color: '#D9552B',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
   // Bottom bar
   bottomBar: {
     paddingHorizontal: 20,

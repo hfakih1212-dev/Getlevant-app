@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { useT } from '../../lib/i18n'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useCartStore, CartItem } from '../../store/useCartStore'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
@@ -116,6 +117,7 @@ function CartItemRow({ item, onUpdateQty, onRemove }: RowProps) {
 export default function CartScreen({ navigation }: Props) {
   const session = useAuthStore((s) => s.session)
   const items = useCartStore((s) => s.items)
+  const t = useT()
   const updateQuantity = useCartStore((s) => s.updateQuantity)
   const removeItem = useCartStore((s) => s.removeItem)
 
@@ -172,7 +174,7 @@ export default function CartScreen({ navigation }: Props) {
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Your Bag</Text>
+          <Text style={styles.headerTitle}>{t('cart.title')}</Text>
           {totalQty > 0 && (
             <View style={styles.countBadge}>
               <Text style={styles.countBadgeText}>{totalQty}</Text>
@@ -194,16 +196,16 @@ export default function CartScreen({ navigation }: Props) {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>🛍</Text>
-            <Text style={styles.emptyTitle}>Your bag is empty</Text>
+            <Text style={styles.emptyTitle}>{t('cart.empty')}</Text>
             <Text style={styles.emptyBody}>
-              Browse the marketplace and add items to get started.
+              {t('cart.emptyBody')}
             </Text>
             <TouchableOpacity
               style={styles.browseBtn}
               onPress={() => navigation.navigate('MarketplaceFeed')}
               activeOpacity={0.8}
             >
-              <Text style={styles.browseBtnText}>Browse Products</Text>
+              <Text style={styles.browseBtnText}>{t('cart.browse')}</Text>
             </TouchableOpacity>
           </View>
         }
@@ -212,11 +214,11 @@ export default function CartScreen({ navigation }: Props) {
       {/* Sticky bottom bar */}
       <View style={styles.bottomBar}>
         <View style={styles.subtotalRow}>
-          <Text style={styles.subtotalLabel}>Subtotal</Text>
+          <Text style={styles.subtotalLabel}>{t('cart.subtotal')}</Text>
           <Text style={styles.subtotalValue}>${subtotal.toFixed(2)} USD</Text>
         </View>
         {session === null && totalQty > 0 && (
-          <Text style={styles.guestHint}>Sign in to place your order — your bag is saved.</Text>
+          <Text style={styles.guestHint}>{t('cart.guestHint')}</Text>
         )}
         <TouchableOpacity
           style={[styles.checkoutBtn, totalQty === 0 && styles.checkoutBtnDisabled]}
@@ -225,7 +227,7 @@ export default function CartScreen({ navigation }: Props) {
           activeOpacity={0.85}
         >
           <Text style={styles.checkoutBtnText}>
-            {session === null ? 'Sign in to Checkout' : 'Proceed to Checkout'}
+            {session === null ? t('cart.signInToCheckout') : t('cart.checkout')}
           </Text>
         </TouchableOpacity>
       </View>

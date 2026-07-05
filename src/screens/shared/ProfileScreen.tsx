@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import * as Clipboard from 'expo-clipboard'
+import { LOCALE_OPTIONS, useLocaleStore, useT } from '../../lib/i18n'
 import { getLoyaltyProgress } from '../../lib/loyalty'
 import { registerForPushNotifications } from '../../lib/push'
 import { supabase } from '../../lib/supabase'
@@ -133,6 +134,9 @@ export default function ProfileScreen() {
   const user        = useAuthStore(s => s.user)
   const signOut     = useAuthStore(s => s.signOut)
   const refreshUser = useAuthStore(s => s.refreshUser)
+  const t           = useT()
+  const locale      = useLocaleStore(s => s.locale)
+  const setLocale   = useLocaleStore(s => s.setLocale)
 
   // Fresh user row from DB (notification_prefs and push_token may have changed)
   const [prefs,       setPrefs]       = useState<NotifPrefs>(DEFAULT_PREFS)
@@ -581,6 +585,36 @@ export default function ProfileScreen() {
               </SectionCard>
             </>
           )}
+
+          {/* ── Language ── */}
+          <SectionLabel text={t('profile.language')} />
+          <SectionCard>
+            <View style={styles.languageRow}>
+              <Text style={styles.rowHint}>{t('profile.languageHint')}</Text>
+              <View style={styles.languageToggle}>
+                {LOCALE_OPTIONS.map(opt => {
+                  const active = locale === opt.value
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.languageSegment, active && styles.languageSegmentActive]}
+                      onPress={() => setLocale(opt.value)}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.languageSegmentText,
+                          active && styles.languageSegmentActiveText,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+            </View>
+          </SectionCard>
 
           {/* ── Sign out ── */}
           <SectionLabel text="Account" />
@@ -1042,6 +1076,43 @@ const styles = StyleSheet.create({
   inlineErrorPadded: {
     paddingHorizontal: 16,
     paddingTop: 8,
+  },
+
+  // Language
+  languageRow: {
+    padding: 16,
+    gap: 12,
+  },
+  languageToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#F5EFE6',
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  languageSegment: {
+    flex: 1,
+    height: 40,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  languageSegmentActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#1C1612',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  languageSegmentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7A6A5A',
+  },
+  languageSegmentActiveText: {
+    color: '#1C1612',
+    fontWeight: '700',
   },
 
   // Sign out

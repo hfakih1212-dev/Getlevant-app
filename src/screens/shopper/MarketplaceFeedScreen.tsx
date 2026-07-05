@@ -18,9 +18,11 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import ConditionBadge from '../../components/ConditionBadge'
 import Skeleton from '../../components/Skeleton'
 import { CATEGORY_OPTIONS, LEBANON_REGIONS, LebanonRegion, ProductCategory } from '../../lib/catalog'
+import { useT } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useCartStore } from '../../store/useCartStore'
+import { useFavoritesStore } from '../../store/useFavoritesStore'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
 
 type Props = NativeStackScreenProps<ShopperStackParamList, 'MarketplaceFeed'>
@@ -39,7 +41,8 @@ const fetchFeed = () =>
       price_usd,
       category,
       condition,
-      stores!inner ( name, region ),
+      created_at,
+      stores!inner ( id, name, region, rating, logo_url ),
       product_images ( url, position ),
       product_variants ( size, color, color_hex, stock )
     `,
@@ -56,10 +59,10 @@ type FeedProduct = NonNullable<Awaited<ReturnType<typeof fetchFeed>>['data']>[0]
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc'
 
-const SORT_OPTIONS: { value: SortOption; label: string }[] = [
-  { value: 'newest',     label: 'Newest'  },
-  { value: 'price_asc',  label: 'Price ↑' },
-  { value: 'price_desc', label: 'Price ↓' },
+const SORT_OPTIONS: { value: SortOption; labelKey: 'feed.sortNewest' | 'feed.sortPriceAsc' | 'feed.sortPriceDesc' }[] = [
+  { value: 'newest',     labelKey: 'feed.sortNewest'   },
+  { value: 'price_asc',  labelKey: 'feed.sortPriceAsc' },
+  { value: 'price_desc', labelKey: 'feed.sortPriceDesc' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -77,9 +80,17 @@ const SKELETON_COUNT    = 6
 // Helpers
 // ---------------------------------------------------------------------------
 
-function resolveStore(stores: FeedProduct['stores']): { name: string; region: string | null } | null {
+type FeedStore = {
+  id: string
+  name: string
+  region: string | null
+  rating: number | null
+  logo_url: string | null
+}
+
+function resolveStore(stores: FeedProduct['stores']): FeedStore | null {
   if (!stores) return null
-  return (Array.isArray(stores) ? stores[0] : stores) as { name: string; region: string | null } | null
+  return (Array.isArray(stores) ? stores[0] : stores) as FeedStore | null
 }
 
 // ---------------------------------------------------------------------------
@@ -90,10 +101,14 @@ type CardProps = {
   item: FeedProduct
   cardWidth: number
   imageHeight: number
+  favorite: boolean
   onPress: (item: FeedProduct) => void
+  onToggleFav: (productId: string) => void
 }
 
-const ProductCard = React.memo(function ProductCard({ item, cardWidth, imageHeight, onPress }: CardProps) {
+const ProductCard = React.memo(function ProductCard({
+  item, cardWidth, imageHeight, favorite, onPress, onToggleFav,
+}: CardProps) {
   const images = Array.isArray(item.product_images) ? item.product_images : []
   const coverUrl = [...images].sort((a, b) => a.position - b.position)[0]?.url ?? null
 
@@ -121,16 +136,62 @@ const ProductCard = React.memo(function ProductCard({ item, cardWidth, imageHeig
         <View style={styles.cardBadge}>
           <ConditionBadge condition={item.condition} />
         </View>
+        <TouchableOpacity
+          style={styles.heartBtn}
+          onPress={() => onToggleFav(item.id)}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Text style={favorite ? styles.heartFilled : styles.heartEmpty}>
+            {favorite ? '♥' : '♡'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Text block */}
       <View style={styles.cardInfo}>
-        {store ? (
-          <Text style={styles.storeName} numberOfLines={1}>{store.name}</Text>
-        ) : null}
+        <View style={styles.storeRow}>
+          {store ? (
+            <Text style={styles.storeName} numberOfLines={1}>{store.name}</Text>
+          ) : null}
+          {store?.rating != null && (
+            <Text style={styles.cardRating}>★ {store.rating.toFixed(1)}</Text>
+          )}
+        </View>
         <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.price}>{price}</Text>
       </View>
+    </TouchableOpacity>
+  )
+})
+
+// ---------------------------------------------------------------------------
+// RailCard — compact product card for horizontal editorial rails
+// ---------------------------------------------------------------------------
+
+const RAIL_CARD_WIDTH = 124
+const RAIL_IMAGE_HEIGHT = 150
+
+const RailCard = React.memo(function RailCard({
+  item, onPress,
+}: { item: FeedProduct; onPress: (item: FeedProduct) => void }) {
+  const coverUrl =
+    [...(Array.isArray(item.product_images) ? item.product_images : [])]
+      .sort((a, b) => a.position - b.position)[0]?.url ?? null
+  return (
+    <TouchableOpacity
+      style={styles.railCard}
+      onPress={() => onPress(item)}
+      activeOpacity={0.85}
+    >
+      <View style={styles.railImageContainer}>
+        {coverUrl ? (
+          <Image source={{ uri: coverUrl }} style={styles.cardImage} contentFit="cover" transition={200} />
+        ) : (
+          <View style={styles.cardImage} />
+        )}
+      </View>
+      <Text style={styles.railName} numberOfLines={1}>{item.name}</Text>
+      <Text style={styles.railPrice}>${Number(item.price_usd).toFixed(0)}</Text>
     </TouchableOpacity>
   )
 })
@@ -164,6 +225,9 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
   const session   = useAuthStore(s => s.session)
   const initial   = (user?.phone ?? user?.email ?? '?').replace(/^\+/, '').charAt(0).toUpperCase()
   const cartCount = useCartStore(s => s.items.reduce((sum, i) => sum + i.quantity, 0))
+  const favIds    = useFavoritesStore(s => s.ids)
+  const toggleFav = useFavoritesStore(s => s.toggle)
+  const t         = useT()
 
   // Card size tracks the window so the grid stays fluid on rotation and
   // never balloons on tablets / web — content is capped and centered instead.
@@ -243,6 +307,43 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
     [navigation],
   )
 
+  // Guests tapping a heart are routed to sign-in — favorites are account-backed
+  const handleToggleFav = useCallback(
+    (productId: string) => {
+      if (!user?.id) {
+        navigation.navigate('Login')
+        return
+      }
+      void toggleFav(user.id, productId)
+    },
+    [user?.id, toggleFav, navigation],
+  )
+
+  // ---- Editorial rails (hidden while filtering/searching) ----
+
+  const newThisWeek = useMemo(() => {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+    return products
+      .filter(p => p.created_at && new Date(p.created_at).getTime() >= cutoff)
+      .slice(0, 10)
+  }, [products])
+
+  const thriftedPicks = useMemo(
+    () => products.filter(p => p.condition === 'thrifted').slice(0, 10),
+    [products],
+  )
+
+  // Highest-rated store in the feed, falling back to the most recent one
+  const featuredStore = useMemo<FeedStore | null>(() => {
+    let best: FeedStore | null = null
+    for (const p of products) {
+      const s = resolveStore(p.stores)
+      if (!s) continue
+      if (!best || (s.rating ?? -1) > (best.rating ?? -1)) best = s
+    }
+    return best
+  }, [products])
+
   const handleRegionPress = useCallback((region: LebanonRegion) => {
     setSelectedRegion(prev => (prev === region ? null : region))
   }, [])
@@ -264,10 +365,12 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
         item={item}
         cardWidth={cardWidth}
         imageHeight={imageHeight}
+        favorite={favIds.has(item.id)}
         onPress={handlePress}
+        onToggleFav={handleToggleFav}
       />
     ),
-    [handlePress, cardWidth, imageHeight],
+    [handlePress, handleToggleFav, cardWidth, imageHeight, favIds],
   )
 
   const keyExtractor = useCallback((item: FeedProduct) => item.id, [])
@@ -286,9 +389,18 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
       <View style={styles.header}>
         <View>
           <Text style={styles.brandName}>Souk</Text>
-          <Text style={styles.brandSub}>Local boutiques, delivered</Text>
+          <Text style={styles.brandSub}>{t('feed.tagline')}</Text>
         </View>
         <View style={styles.headerActions}>
+          {session !== null && (
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => navigation.navigate('Favorites')}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.heartIconText}>♡</Text>
+            </TouchableOpacity>
+          )}
           {session !== null && (
             <TouchableOpacity
               style={styles.iconBtn}
@@ -324,7 +436,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
               onPress={() => navigation.navigate('Login')}
               activeOpacity={0.8}
             >
-              <Text style={styles.signInBtnText}>Sign in</Text>
+              <Text style={styles.signInBtnText}>{t('common.signIn')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -338,7 +450,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
             style={styles.searchInput}
             value={searchText}
             onChangeText={setSearchText}
-            placeholder="Search products or stores…"
+            placeholder={t('feed.searchPlaceholder')}
             placeholderTextColor="#B0A090"
             returnKeyType="search"
             autoCorrect={false}
@@ -366,7 +478,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
               selectedCategory === null && styles.categoryPillActiveText,
             ]}
           >
-            All
+            {t('feed.all')}
           </Text>
         </TouchableOpacity>
         {CATEGORY_OPTIONS.map(opt => {
@@ -404,7 +516,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
               activeOpacity={0.75}
             >
               <Text style={[styles.pillText, active && styles.pillSortActiveText]}>
-                {opt.label}
+                {t(opt.labelKey)}
               </Text>
             </TouchableOpacity>
           )
@@ -438,7 +550,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
         <View style={styles.errorState}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => load()} activeOpacity={0.8}>
-            <Text style={styles.retryBtnText}>Retry</Text>
+            <Text style={styles.retryBtnText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -450,6 +562,73 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
           contentContainerStyle={styles.listContent}
           columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            !isFiltering && products.length > 0 ? (
+              <View style={styles.railsWrap}>
+                {/* Featured boutique */}
+                {featuredStore && (
+                  <TouchableOpacity
+                    style={styles.featuredCard}
+                    onPress={() => navigation.navigate('StoreProfile', { storeId: featuredStore.id })}
+                    activeOpacity={0.85}
+                  >
+                    {featuredStore.logo_url ? (
+                      <Image source={{ uri: featuredStore.logo_url }} style={styles.featuredLogo} contentFit="cover" />
+                    ) : (
+                      <View style={styles.featuredLogoFallback}>
+                        <Text style={styles.featuredLogoInitial}>
+                          {featuredStore.name.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.featuredBody}>
+                      <Text style={styles.featuredLabel}>{t('feed.featuredBoutique')}</Text>
+                      <Text style={styles.featuredName} numberOfLines={1}>{featuredStore.name}</Text>
+                      <Text style={styles.featuredMeta} numberOfLines={1}>
+                        {featuredStore.rating != null ? `★ ${featuredStore.rating.toFixed(1)}` : t('product.newStore')}
+                        {featuredStore.region ? `  ·  ${featuredStore.region}` : ''}
+                      </Text>
+                    </View>
+                    <Text style={styles.featuredCta}>{t('feed.visit')}</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* New this week */}
+                {newThisWeek.length > 0 && (
+                  <View style={styles.rail}>
+                    <Text style={styles.railTitle}>{t('feed.newThisWeek')}</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.railStrip}
+                    >
+                      {newThisWeek.map(p => (
+                        <RailCard key={p.id} item={p} onPress={handlePress} />
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* Thrifted picks */}
+                {thriftedPicks.length > 0 && (
+                  <View style={styles.rail}>
+                    <Text style={styles.railTitle}>{t('feed.thriftedPicks')}</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.railStrip}
+                    >
+                      {thriftedPicks.map(p => (
+                        <RailCard key={p.id} item={p} onPress={handlePress} />
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                <Text style={styles.railTitle}>{t('feed.allProducts')}</Text>
+              </View>
+            ) : null
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -462,16 +641,16 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>🛍</Text>
               <Text style={styles.emptyTitle}>
-                {isFiltering ? 'No matches' : 'Nothing here yet'}
+                {isFiltering ? t('feed.noMatches') : t('feed.nothingYet')}
               </Text>
               <Text style={styles.emptyBody}>
                 {isFiltering
-                  ? 'Try a different search, category, or region.'
-                  : 'New boutiques are joining Souk every day.'}
+                  ? t('feed.tryDifferent')
+                  : t('feed.newBoutiques')}
               </Text>
               {isFiltering && (
                 <TouchableOpacity style={styles.clearBtn} onPress={clearFilters} activeOpacity={0.8}>
-                  <Text style={styles.clearBtnText}>Clear filters</Text>
+                  <Text style={styles.clearBtnText}>{t('feed.clearFilters')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -534,6 +713,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconBtnText: { fontSize: 18 },
+  heartIconText: {
+    fontSize: 19,
+    color: '#D9552B',
+    fontWeight: '700',
+    lineHeight: 22,
+  },
   cartBadge: {
     position: 'absolute',
     top: 2,
@@ -724,12 +909,45 @@ const styles = StyleSheet.create({
     top: 8,
     left: 8,
   },
+  heartBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heartFilled: {
+    fontSize: 16,
+    color: '#D9552B',
+    lineHeight: 19,
+  },
+  heartEmpty: {
+    fontSize: 16,
+    color: '#7A6A5A',
+    lineHeight: 19,
+  },
   cardInfo: {
     paddingHorizontal: 2,
     paddingTop: 8,
     gap: 2,
   },
+  storeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  cardRating: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#7A6A5A',
+  },
   storeName: {
+    flexShrink: 1,
     fontSize: 10,
     fontWeight: '700',
     color: '#D9552B',
@@ -747,6 +965,98 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#1C1612',
     marginTop: 2,
+  },
+
+  // ── Editorial rails ──
+  railsWrap: {
+    gap: 14,
+    marginBottom: 18,
+  },
+  featuredCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F5EFE6',
+    borderRadius: 16,
+    padding: 14,
+  },
+  featuredLogo: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#F0E9DF',
+  },
+  featuredLogoFallback: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#1C1612',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  featuredLogoInitial: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  featuredBody: { flex: 1, gap: 1 },
+  featuredLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#7A6A5A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+  },
+  featuredName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1612',
+  },
+  featuredMeta: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#D9552B',
+  },
+  featuredCta: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1C1612',
+    paddingLeft: 4,
+  },
+  rail: {
+    gap: 10,
+  },
+  railTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1C1612',
+    letterSpacing: -0.2,
+  },
+  railStrip: {
+    gap: 10,
+    flexDirection: 'row',
+  },
+  railCard: {
+    width: RAIL_CARD_WIDTH,
+  },
+  railImageContainer: {
+    width: '100%',
+    height: RAIL_IMAGE_HEIGHT,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#F0E9DF',
+  },
+  railName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#1C1612',
+    paddingTop: 6,
+  },
+  railPrice: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1C1612',
+    paddingTop: 1,
   },
 
   // ── Empty state ──

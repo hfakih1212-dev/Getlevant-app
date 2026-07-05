@@ -4,6 +4,7 @@ import { NavigationContainer, LinkingOptions } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import * as Linking from 'expo-linking'
 import { useAuthStore } from '../store/useAuthStore'
+import { useFavoritesStore } from '../store/useFavoritesStore'
 import { syncPushToken } from '../lib/push'
 import PhoneLoginScreen from '../screens/auth/PhoneLoginScreen'
 import MarketplaceFeedScreen from '../screens/shopper/MarketplaceFeedScreen'
@@ -13,6 +14,7 @@ import CartScreen from '../screens/shopper/CartScreen'
 import CheckoutScreen from '../screens/shopper/CheckoutScreen'
 import OrderConfirmationScreen from '../screens/shopper/OrderConfirmationScreen'
 import MyOrdersScreen from '../screens/shopper/MyOrdersScreen'
+import FavoritesScreen from '../screens/shopper/FavoritesScreen'
 import ShipmentTrackingScreen from '../screens/shopper/ShipmentTrackingScreen'
 import VendorDashboardScreen from '../screens/vendor/VendorDashboardScreen'
 import ShipmentCreateScreen from '../screens/vendor/ShipmentCreateScreen'
@@ -35,6 +37,7 @@ export type ShopperStackParamList = {
   OrderConfirmation: { orderNumber: string }
   MyOrders: undefined
   ShipmentTracking: { orderId: string }
+  Favorites: undefined
   Profile: undefined
   Login: undefined
 }
@@ -55,7 +58,7 @@ export type VendorStackParamList = {
 // ---------------------------------------------------------------------------
 
 const linking: LinkingOptions<ShopperStackParamList> = {
-  prefixes: [Linking.createURL('/')],
+  prefixes: [Linking.createURL('/'), 'https://souk-app.expo.app'],
   config: {
     // Deep links mount on top of the feed so back navigation always works —
     // without this a shared product link opens a stack of one stranded screen
@@ -67,6 +70,7 @@ const linking: LinkingOptions<ShopperStackParamList> = {
       Cart: 'cart',
       MyOrders: 'orders',
       ShipmentTracking: 'orders/:orderId',
+      Favorites: 'saved',
       Profile: 'profile',
       Login: 'login',
     },
@@ -114,6 +118,7 @@ function ShopperStack({ signedIn }: { signedIn: boolean }) {
           <ShopperNav.Screen name="OrderConfirmation" component={OrderConfirmationScreen} />
           <ShopperNav.Screen name="MyOrders" component={MyOrdersScreen} />
           <ShopperNav.Screen name="ShipmentTracking" component={ShipmentTrackingScreen} />
+          <ShopperNav.Screen name="Favorites" component={FavoritesScreen} />
           <ShopperNav.Screen name="Profile" component={ProfileScreen} />
         </>
       ) : (
@@ -138,6 +143,12 @@ export default function RootNavigator() {
   // when notification permission was already granted on this device.
   useEffect(() => {
     if (user?.id) void syncPushToken(user.id)
+  }, [user?.id])
+
+  // Mirror server favorites locally for instant hearts; drop them on sign-out
+  useEffect(() => {
+    if (user?.id) void useFavoritesStore.getState().load(user.id)
+    else useFavoritesStore.getState().clear()
   }, [user?.id])
 
   if (loading) {

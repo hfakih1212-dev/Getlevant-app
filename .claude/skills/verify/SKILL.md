@@ -25,6 +25,9 @@ Playwright is not a project dependency — install ephemerally:
 npm install --no-save playwright && npx playwright install chromium
 ```
 
+Any later `npm install` / `npx expo install` prunes the unsaved playwright from
+node_modules — reinstall it right before running the driver.
+
 Write a `.cjs` driver in the repo root (so `require('playwright')` resolves), delete after.
 Use `getByText` selectors (RN-web renders Text as divs). Grant
 `clipboard-read`/`clipboard-write` permissions to test the share→copy flow.

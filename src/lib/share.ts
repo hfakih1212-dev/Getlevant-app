@@ -1,15 +1,16 @@
 import { Platform, Share } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
-import * as Linking from 'expo-linking'
 
-// souk://product/<id> on native; http(s)://<host>/product/<id> on web —
-// paths must mirror the linking config in RootNavigator.
+// EAS Hosting production deployment — anyone can open these in a browser
+// and browse as a guest. Paths mirror the linking config in RootNavigator.
+export const WEB_BASE_URL = 'https://souk-app.expo.app'
+
 export function productLink(productId: string): string {
-  return Linking.createURL(`product/${productId}`)
+  return `${WEB_BASE_URL}/product/${productId}`
 }
 
 export function storeLink(storeId: string): string {
-  return Linking.createURL(`store/${storeId}`)
+  return `${WEB_BASE_URL}/store/${storeId}`
 }
 
 export type ShareOutcome = 'shared' | 'copied' | 'dismissed'

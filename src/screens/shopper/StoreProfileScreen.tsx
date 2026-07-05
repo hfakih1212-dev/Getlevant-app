@@ -26,7 +26,7 @@ type Props = NativeStackScreenProps<ShopperStackParamList, 'StoreProfile'>
 const fetchStore = (id: string) =>
   supabase
     .from('stores')
-    .select('id, name, description, region, rating, created_at')
+    .select('id, name, description, region, rating, logo_url, created_at')
     .eq('id', id)
     .maybeSingle()
 
@@ -230,9 +230,13 @@ export default function StoreProfileScreen({ route, navigation }: Props) {
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.storeAvatar}>
-                <Text style={styles.storeAvatarText}>{store.name.charAt(0).toUpperCase()}</Text>
-              </View>
+              {store.logo_url ? (
+                <Image source={{ uri: store.logo_url }} style={styles.storeLogo} contentFit="cover" />
+              ) : (
+                <View style={styles.storeAvatar}>
+                  <Text style={styles.storeAvatarText}>{store.name.charAt(0).toUpperCase()}</Text>
+                </View>
+              )}
               <Text style={styles.heroName}>{store.name}</Text>
 
               <View style={styles.heroMetaRow}>
@@ -374,6 +378,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C1612',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  storeLogo: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#F0E9DF',
     marginBottom: 12,
   },
   storeAvatarText: {

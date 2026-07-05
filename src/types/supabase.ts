@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       order_items: {
@@ -71,6 +96,7 @@ export type Database = {
           created_at: string | null
           delivery_address: string | null
           delivery_fee_usd: number
+          delivery_region: string | null
           id: string
           notes: string | null
           order_number: string | null
@@ -88,6 +114,7 @@ export type Database = {
           created_at?: string | null
           delivery_address?: string | null
           delivery_fee_usd?: number
+          delivery_region?: string | null
           id?: string
           notes?: string | null
           order_number?: string | null
@@ -105,6 +132,7 @@ export type Database = {
           created_at?: string | null
           delivery_address?: string | null
           delivery_fee_usd?: number
+          delivery_region?: string | null
           id?: string
           notes?: string | null
           order_number?: string | null
@@ -207,6 +235,8 @@ export type Database = {
       }
       products: {
         Row: {
+          category: Database["public"]["Enums"]["product_category"] | null
+          condition: Database["public"]["Enums"]["product_condition"]
           created_at: string | null
           description: string | null
           id: string
@@ -216,6 +246,8 @@ export type Database = {
           store_id: string
         }
         Insert: {
+          category?: Database["public"]["Enums"]["product_category"] | null
+          condition?: Database["public"]["Enums"]["product_condition"]
           created_at?: string | null
           description?: string | null
           id?: string
@@ -225,6 +257,8 @@ export type Database = {
           store_id: string
         }
         Update: {
+          category?: Database["public"]["Enums"]["product_category"] | null
+          condition?: Database["public"]["Enums"]["product_condition"]
           created_at?: string | null
           description?: string | null
           id?: string
@@ -239,6 +273,99 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string
+          order_id: string
+          rating: number
+          shopper_id: string
+          store_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          order_id: string
+          rating: number
+          shopper_id: string
+          store_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          order_id?: string
+          rating?: number
+          shopper_id?: string
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_shopper_id_fkey"
+            columns: ["shopper_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rewards: {
+        Row: {
+          code: string
+          created_at: string | null
+          discount_pct: number
+          id: string
+          milestone: number
+          seen: boolean
+          status: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          discount_pct: number
+          id?: string
+          milestone: number
+          seen?: boolean
+          status?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          discount_pct?: number
+          id?: string
+          milestone?: number
+          seen?: boolean
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rewards_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -338,6 +465,7 @@ export type Database = {
           id: string
           name: string
           owner_id: string
+          rating: number | null
           region: string | null
           status: string
           whatsapp: string | null
@@ -348,6 +476,7 @@ export type Database = {
           id?: string
           name: string
           owner_id: string
+          rating?: number | null
           region?: string | null
           status?: string
           whatsapp?: string | null
@@ -358,6 +487,7 @@ export type Database = {
           id?: string
           name?: string
           owner_id?: string
+          rating?: number | null
           region?: string | null
           status?: string
           whatsapp?: string | null
@@ -374,32 +504,38 @@ export type Database = {
       }
       users: {
         Row: {
+          completed_orders_count: number
           created_at: string | null
           email: string | null
           id: string
           notification_prefs: Json
           phone: string | null
           push_token: string | null
+          referral_code: string | null
           role: string
           store_id: string | null
         }
         Insert: {
+          completed_orders_count?: number
           created_at?: string | null
           email?: string | null
           id: string
           notification_prefs?: Json
           phone?: string | null
           push_token?: string | null
+          referral_code?: string | null
           role?: string
           store_id?: string | null
         }
         Update: {
+          completed_orders_count?: number
           created_at?: string | null
           email?: string | null
           id?: string
           notification_prefs?: Json
           phone?: string | null
           push_token?: string | null
+          referral_code?: string | null
           role?: string
           store_id?: string | null
         }
@@ -410,8 +546,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      become_vendor: { Args: never; Returns: undefined }
       current_user_role: { Args: never; Returns: string }
+      ensure_my_profile: {
+        Args: never
+        Returns: {
+          completed_orders_count: number
+          created_at: string | null
+          email: string | null
+          id: string
+          notification_prefs: Json
+          phone: string | null
+          push_token: string | null
+          referral_code: string | null
+          role: string
+          store_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "users"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       owns_store: { Args: { p_store_id: string }; Returns: boolean }
+      vendor_analytics: { Args: never; Returns: Json }
     }
     Enums: {
       courier_type:
@@ -432,6 +591,14 @@ export type Database = {
         | "cancelled"
       payment_method: "whatsapp" | "cash_on_delivery" | "bank_transfer"
       payment_status: "pending" | "paid" | "failed" | "refunded"
+      product_category:
+        | "tops"
+        | "bottoms"
+        | "dresses"
+        | "outerwear"
+        | "accessories"
+        | "shoes"
+      product_condition: "brand_new" | "thrifted"
       shipment_status:
         | "pending"
         | "picked_up"
@@ -565,6 +732,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       courier_type: [
@@ -587,6 +757,15 @@ export const Constants = {
       ],
       payment_method: ["whatsapp", "cash_on_delivery", "bank_transfer"],
       payment_status: ["pending", "paid", "failed", "refunded"],
+      product_category: [
+        "tops",
+        "bottoms",
+        "dresses",
+        "outerwear",
+        "accessories",
+        "shoes",
+      ],
+      product_condition: ["brand_new", "thrifted"],
       shipment_status: [
         "pending",
         "picked_up",

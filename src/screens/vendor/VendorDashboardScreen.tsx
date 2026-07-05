@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   ListRenderItem,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,8 +13,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import Skeleton from '../../components/Skeleton'
+import { CATEGORY_LABEL, CONDITION_OPTIONS } from '../../lib/catalog'
 import { supabase } from '../../lib/supabase'
 import { notifyStatusChanged } from '../../lib/whatsapp'
+import { pushNotifyStatusChanged } from '../../lib/push'
 import { useAuthStore } from '../../store/useAuthStore'
 import { Database } from '../../types/supabase'
 import type { VendorStackParamList } from '../../navigation/RootNavigator'
@@ -25,6 +29,16 @@ type Props = NativeStackScreenProps<VendorStackParamList, 'VendorDashboard'>
 // ---------------------------------------------------------------------------
 
 type OrderStatus = Database['public']['Enums']['order_status']
+type ProductCondition = Database['public']['Enums']['product_condition']
+
+// Shape produced by the vendor_analytics() SQL function
+interface VendorAnalytics {
+  total_revenue_usd: number
+  orders_delivered: number
+  items_by_condition: Partial<Record<ProductCondition, number>>
+  top_categories: { category: string; units: number }[]
+  regions: { region: string; orders: number }[]
+}
 
 // ---------------------------------------------------------------------------
 // Query — outside component for stable ReturnType inference
@@ -137,6 +151,132 @@ function formatItemLine(item: OrderItem): string {
 }
 
 // ---------------------------------------------------------------------------
+// AnalyticsStrip — horizontally scrolling stat cards above the order tabs
+// ---------------------------------------------------------------------------
+
+function categoryLabel(value: string): string {
+  return (CATEGORY_LABEL as Record<string, string>)[value] ?? 'Uncategorized'
+}
+
+function pct(part: number, total: number): string {
+  if (total <= 0) return '0%'
+  return `${Math.round((part / total) * 100)}%`
+}
+
+type AnalyticsStripProps = {
+  stats: VendorAnalytics | null
+  loading: boolean
+  error: string | null
+}
+
+function AnalyticsStrip({ stats, loading, error }: AnalyticsStripProps) {
+  if (loading) {
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.statsStrip}
+        style={styles.statsBar}
+      >
+        {Array.from({ length: 4 }, (_, i) => (
+          <View key={i} style={styles.statCard}>
+            <Skeleton style={styles.statSkeletonLabel} />
+            <Skeleton style={styles.statSkeletonValue} />
+            <Skeleton style={styles.statSkeletonSub} />
+          </View>
+        ))}
+      </ScrollView>
+    )
+  }
+
+  if (error) {
+    return <Text style={styles.statsError}>Couldn't load analytics: {error}</Text>
+  }
+  if (!stats) return null
+
+  const conditionEntries = CONDITION_OPTIONS.map(o => ({
+    label: o.label,
+    units: stats.items_by_condition[o.value] ?? 0,
+  }))
+  const itemsTotal    = conditionEntries.reduce((sum, e) => sum + e.units, 0)
+  const categoryTotal = stats.top_categories.reduce((sum, c) => sum + c.units, 0)
+  const regionTotal   = stats.regions.reduce((sum, r) => sum + r.orders, 0)
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.statsStrip}
+      style={styles.statsBar}
+    >
+      {/* Total revenue */}
+      <View style={styles.statCard}>
+        <Text style={styles.statLabel}>Total Revenue</Text>
+        <Text style={styles.statValue}>${Number(stats.total_revenue_usd).toFixed(0)}</Text>
+        <Text style={styles.statSub}>Delivered sales, USD</Text>
+      </View>
+
+      {/* Orders processed */}
+      <View style={styles.statCard}>
+        <Text style={styles.statLabel}>Orders</Text>
+        <Text style={styles.statValue}>{stats.orders_delivered}</Text>
+        <Text style={styles.statSub}>Delivered to buyers</Text>
+      </View>
+
+      {/* Brand New vs Thrifted */}
+      <View style={[styles.statCard, styles.statCardWide]}>
+        <Text style={styles.statLabel}>Items Sold</Text>
+        {itemsTotal === 0 ? (
+          <Text style={styles.statSub}>No sales yet</Text>
+        ) : (
+          conditionEntries.map(e => (
+            <View key={e.label} style={styles.breakdownRow}>
+              <Text style={styles.breakdownName}>{e.label}</Text>
+              <Text style={styles.breakdownUnits}>{e.units}</Text>
+              <Text style={styles.breakdownPct}>{pct(e.units, itemsTotal)}</Text>
+            </View>
+          ))
+        )}
+      </View>
+
+      {/* Top categories */}
+      <View style={[styles.statCard, styles.statCardWide]}>
+        <Text style={styles.statLabel}>Top Categories</Text>
+        {stats.top_categories.length === 0 ? (
+          <Text style={styles.statSub}>No sales yet</Text>
+        ) : (
+          stats.top_categories.slice(0, 3).map((c, i) => (
+            <View key={c.category} style={styles.breakdownRow}>
+              <Text style={styles.breakdownName} numberOfLines={1}>
+                {i + 1}. {categoryLabel(c.category)}
+              </Text>
+              <Text style={styles.breakdownUnits}>{c.units}</Text>
+              <Text style={styles.breakdownPct}>{pct(c.units, categoryTotal)}</Text>
+            </View>
+          ))
+        )}
+      </View>
+
+      {/* Regional reach */}
+      <View style={[styles.statCard, styles.statCardWide]}>
+        <Text style={styles.statLabel}>Regional Reach</Text>
+        {stats.regions.length === 0 ? (
+          <Text style={styles.statSub}>No orders yet</Text>
+        ) : (
+          stats.regions.slice(0, 3).map(r => (
+            <View key={r.region} style={styles.breakdownRow}>
+              <Text style={styles.breakdownName} numberOfLines={1}>{r.region}</Text>
+              <Text style={styles.breakdownUnits}>{r.orders}</Text>
+              <Text style={styles.breakdownPct}>{pct(r.orders, regionTotal)}</Text>
+            </View>
+          ))
+        )}
+      </View>
+    </ScrollView>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // OrderCard
 // ---------------------------------------------------------------------------
 
@@ -217,7 +357,7 @@ function OrderCard({ order, onAdvance, advancing, onCreateShipment, onCancel }: 
           {advancing ? (
             <ActivityIndicator
               size="small"
-              color={isPrimary ? '#FAF7F2' : '#C8622A'}
+              color={isPrimary ? '#FFFFFF' : '#D9552B'}
             />
           ) : (
             <Text
@@ -271,6 +411,11 @@ export default function VendorDashboardScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('pending')
   const [advancingId, setAdvancingId] = useState<string | null>(null)
 
+  // Analytics — loads independently of orders so skeletons cover the RPC
+  const [stats,        setStats]        = useState<VendorAnalytics | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [statsError,   setStatsError]   = useState<string | null>(null)
+
   // ---- Fetch ----
 
   const load = useCallback(async () => {
@@ -297,6 +442,20 @@ export default function VendorDashboardScreen({ navigation }: Props) {
     }
 
     setStoreName(store.name)
+
+    // Fire the aggregation RPC without blocking the order list — the strip
+    // shows skeleton cards until it resolves
+    setStatsLoading(true)
+    setStatsError(null)
+    supabase.rpc('vendor_analytics').then(({ data: statsData, error: statsErr }) => {
+      if (statsErr) {
+        setStatsError(statsErr.message)
+      } else {
+        // Shape is fixed by the SQL function; Json → typed view of it
+        setStats((statsData as unknown as VendorAnalytics) ?? null)
+      }
+      setStatsLoading(false)
+    })
 
     const { data, error: ordersErr } = await fetchVendorOrders(store.id)
 
@@ -375,6 +534,7 @@ export default function VendorDashboardScreen({ navigation }: Props) {
 
       if (!updateErr) {
         notifyStatusChanged(orderId, next)
+        pushNotifyStatusChanged(orderId, next)
         setOrders(prev =>
           prev.map(o => (o.id === orderId ? { ...o, status: next } : o)),
         )
@@ -447,7 +607,7 @@ export default function VendorDashboardScreen({ navigation }: Props) {
   if (loading) {
     return (
       <SafeAreaView style={[styles.safe, styles.centered]}>
-        <ActivityIndicator size="large" color="#C8622A" />
+        <ActivityIndicator size="large" color="#D9552B" />
       </SafeAreaView>
     )
   }
@@ -498,6 +658,9 @@ export default function VendorDashboardScreen({ navigation }: Props) {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Analytics strip */}
+      <AnalyticsStrip stats={stats} loading={statsLoading} error={statsError} />
 
       {/* Tab bar */}
       <View style={styles.tabBar}>
@@ -559,7 +722,7 @@ export default function VendorDashboardScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
   },
   centered: {
     justifyContent: 'center',
@@ -573,7 +736,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D5',
+    borderBottomColor: '#ECE6DC',
   },
   headerText: {
     flex: 1,
@@ -593,7 +756,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
@@ -601,7 +764,7 @@ const styles = StyleSheet.create({
   inventoryBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#C8622A',
+    color: '#D9552B',
   },
   settingsBtn: {
     width: 40,
@@ -618,7 +781,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#C8622A',
+    backgroundColor: '#D9552B',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 4,
@@ -626,14 +789,98 @@ const styles = StyleSheet.create({
   profileBtnText: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
+  },
+  // Analytics strip
+  statsBar: {
+    flexGrow: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECE6DC',
+  },
+  statsStrip: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+    flexDirection: 'row',
+  },
+  statCard: {
+    width: 150,
+    borderRadius: 16,
+    backgroundColor: '#F5EFE6',
+    padding: 14,
+    gap: 4,
+  },
+  statCardWide: {
+    width: 210,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#7A6A5A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+  },
+  statValue: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#1C1612',
+    letterSpacing: -0.5,
+  },
+  statSub: {
+    fontSize: 11,
+    color: '#7A6A5A',
+    fontWeight: '500',
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  breakdownName: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1C1612',
+  },
+  breakdownUnits: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1C1612',
+  },
+  breakdownPct: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#D9552B',
+    minWidth: 32,
+    textAlign: 'right',
+  },
+  statSkeletonLabel: {
+    width: '55%',
+    height: 9,
+  },
+  statSkeletonValue: {
+    width: '70%',
+    height: 22,
+    marginTop: 6,
+  },
+  statSkeletonSub: {
+    width: '80%',
+    height: 9,
+    marginTop: 6,
+  },
+  statsError: {
+    fontSize: 12,
+    color: '#D9552B',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   // Tab bar
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D5',
-    backgroundColor: '#FAF7F2',
+    borderBottomColor: '#ECE6DC',
+    backgroundColor: '#FFFFFF',
   },
   tab: {
     flex: 1,
@@ -647,7 +894,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: '#C8622A',
+    borderBottomColor: '#D9552B',
   },
   tabLabel: {
     fontSize: 13,
@@ -655,20 +902,20 @@ const styles = StyleSheet.create({
     color: '#7A6A5A',
   },
   tabLabelActive: {
-    color: '#C8622A',
+    color: '#D9552B',
     fontWeight: '700',
   },
   tabCount: {
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#E8E0D5',
+    backgroundColor: '#ECE6DC',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 5,
   },
   tabCountActive: {
-    backgroundColor: '#C8622A',
+    backgroundColor: '#D9552B',
   },
   tabCountText: {
     fontSize: 11,
@@ -676,7 +923,7 @@ const styles = StyleSheet.create({
     color: '#7A6A5A',
   },
   tabCountTextActive: {
-    color: '#FAF7F2',
+    color: '#FFFFFF',
   },
   // List
   listContent: {
@@ -726,7 +973,7 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#F0EBE3',
+    borderTopColor: '#F5EFE6',
   },
   itemLine: {
     fontSize: 13,
@@ -740,7 +987,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     marginTop: 4,
     borderTopWidth: 1,
-    borderTopColor: '#F0EBE3',
+    borderTopColor: '#F5EFE6',
   },
   totalLabel: {
     fontSize: 13,
@@ -761,11 +1008,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionBtnFilled: {
-    backgroundColor: '#C8622A',
+    backgroundColor: '#D9552B',
   },
   actionBtnOutline: {
     borderWidth: 1.5,
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
     backgroundColor: 'transparent',
   },
   actionBtnDisabled: {
@@ -774,11 +1021,11 @@ const styles = StyleSheet.create({
   actionBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
     letterSpacing: 0.2,
   },
   actionBtnTextOutline: {
-    color: '#C8622A',
+    color: '#D9552B',
   },
   // Empty / error states
   emptyState: {
@@ -791,7 +1038,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#C8622A',
+    color: '#D9552B',
     textAlign: 'center',
     paddingHorizontal: 32,
     marginBottom: 16,
@@ -801,12 +1048,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
   },
   retryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#C8622A',
+    color: '#D9552B',
   },
   // Cancel order button
   cancelBtn: {
@@ -829,7 +1076,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
     backgroundColor: '#FFF3EC',
     justifyContent: 'center',
     alignItems: 'center',
@@ -837,6 +1084,6 @@ const styles = StyleSheet.create({
   shipmentBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#C8622A',
+    color: '#D9552B',
   },
 })

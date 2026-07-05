@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -15,8 +15,16 @@ import {
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Skeleton from '../../components/Skeleton'
 import { useFocusEffect } from '@react-navigation/native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import {
+  CATEGORY_OPTIONS,
+  CONDITION_LABEL,
+  CONDITION_OPTIONS,
+  ProductCategory,
+  ProductCondition,
+} from '../../lib/catalog'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
 import type { VendorStackParamList } from '../../navigation/RootNavigator'
@@ -30,7 +38,7 @@ type Props = NativeStackScreenProps<VendorStackParamList, 'ProductManagement'>
 const fetchStoreProducts = (storeId: string) =>
   supabase
     .from('products')
-    .select('id, name, price_usd, status, product_variants ( stock ), product_images ( url, position )')
+    .select('id, name, price_usd, status, condition, product_variants ( stock ), product_images ( url, position )')
     .eq('store_id', storeId)
     .order('created_at', { ascending: false })
 
@@ -46,6 +54,7 @@ const mkImgKey = () => String(_imgKey++)
 
 interface VariantDraft {
   key: string
+  id?: string   // DB id — present on rows loaded for editing, absent on new rows
   size: string
   color: string
   colorHex: string
@@ -54,18 +63,67 @@ interface VariantDraft {
 
 // Module-level key so each variant gets a stable unique identity
 let _vk = 0
-const mkVariant = (): VariantDraft => ({
+const mkVariant = (init?: Partial<Omit<VariantDraft, 'key'>>): VariantDraft => ({
   key: String(_vk++),
   size: '', color: '', colorHex: '', stock: '',
+  ...init,
 })
 
-type ScreenMode = 'list' | 'add'
+interface ExistingImage { id: string; url: string; position: number }
+
+// Public URLs embed the storage path after the bucket segment — needed to
+// delete the underlying object when a vendor removes a photo.
+function storagePathFromUrl(url: string): string | null {
+  const marker = '/product-images/'
+  const idx = url.indexOf(marker)
+  return idx === -1 ? null : url.slice(idx + marker.length)
+}
+
+type ScreenMode = 'list' | 'add' | 'edit'
+
+// Upload picked images to Storage and record their rows, starting at the
+// given position so edit-mode additions slot in after existing photos.
+async function uploadProductImages(
+  storeId: string,
+  productId: string,
+  picks: ImagePick[],
+  startPosition: number,
+): Promise<void> {
+  for (let i = 0; i < picks.length; i++) {
+    const pick     = picks[i]
+    const ext      = pick.uri.split('.').pop()?.toLowerCase() ?? 'jpg'
+    const position = startPosition + i
+    const path     = `${storeId}/${productId}/${position}-${Date.now()}.${ext}`
+
+    const response = await fetch(pick.uri)
+    const blob     = await response.blob()
+    const { error: uploadErr } = await supabase.storage
+      .from('product-images')
+      .upload(path, blob, { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` })
+    if (uploadErr) throw uploadErr
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(path)
+
+    const { error: imgRowErr } = await supabase
+      .from('product_images')
+      .insert({ product_id: productId, url: publicUrl, position })
+    if (imgRowErr) throw imgRowErr
+  }
+}
 
 // ---------------------------------------------------------------------------
 // ProductCard
 // ---------------------------------------------------------------------------
 
-function ProductCard({ product }: { product: StoreProduct }) {
+const ProductCard = React.memo(function ProductCard({
+  product,
+  onEdit,
+}: {
+  product: StoreProduct
+  onEdit: (productId: string) => void
+}) {
   const totalStock   = product.product_variants.reduce((sum, v) => sum + (v.stock ?? 0), 0)
   const variantCount = product.product_variants.length
   const isActive     = product.status === 'active'
@@ -73,7 +131,11 @@ function ProductCard({ product }: { product: StoreProduct }) {
     .sort((a, b) => a.position - b.position)[0]?.url ?? null
 
   return (
-    <View style={styles.productCard}>
+    <TouchableOpacity
+      style={styles.productCard}
+      onPress={() => onEdit(product.id)}
+      activeOpacity={0.85}
+    >
       <View style={styles.productCardRow}>
         {coverUrl ? (
           <Image source={{ uri: coverUrl }} style={styles.productThumb} resizeMode="cover" />
@@ -97,14 +159,38 @@ function ProductCard({ product }: { product: StoreProduct }) {
 
           <View style={styles.productMeta}>
             <Text style={styles.variantCount}>
-              {variantCount} variant{variantCount !== 1 ? 's' : ''}
+              {CONDITION_LABEL[product.condition]} · {variantCount} variant{variantCount !== 1 ? 's' : ''}
             </Text>
             <Text style={totalStock > 0 ? styles.stockIn : styles.stockOut}>
               {totalStock > 0 ? `${totalStock} in stock` : 'Out of stock'}
             </Text>
           </View>
         </View>
+
+        <View style={styles.productCardChevron}>
+          <Text style={styles.productCardChevronText}>›</Text>
+        </View>
       </View>
+    </TouchableOpacity>
+  )
+})
+
+// ---------------------------------------------------------------------------
+// ListSkeleton — pulsing placeholder rows shown while inventory loads
+// ---------------------------------------------------------------------------
+
+function ListSkeleton() {
+  return (
+    <View style={styles.listContent}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <View key={i} style={styles.skeletonRow}>
+          <Skeleton style={styles.skeletonThumb} />
+          <View style={styles.skeletonBody}>
+            <Skeleton style={styles.skeletonLineWide} />
+            <Skeleton style={styles.skeletonLineNarrow} />
+          </View>
+        </View>
+      ))}
     </View>
   )
 }
@@ -117,7 +203,7 @@ type VariantCardProps = {
   variant: VariantDraft
   index: number
   canRemove: boolean
-  onUpdate: (key: string, field: keyof Omit<VariantDraft, 'key'>, value: string) => void
+  onUpdate: (key: string, field: keyof Omit<VariantDraft, 'key' | 'id'>, value: string) => void
   onRemove: (key: string) => void
 }
 
@@ -200,7 +286,7 @@ function VariantCard({ variant, index, canRemove, onUpdate, onRemove }: VariantC
 // ProductManagementScreen
 // ---------------------------------------------------------------------------
 
-export default function ProductManagementScreen({ navigation }: Props) {
+export default function ProductManagementScreen({ navigation, route }: Props) {
   const user = useAuthStore(s => s.user)
 
   // Store
@@ -213,16 +299,25 @@ export default function ProductManagementScreen({ navigation }: Props) {
   const [listError,   setListError]   = useState<string | null>(null)
 
   // Mode
-  const [mode, setMode] = useState<ScreenMode>('list')
+  const [mode,        setMode]        = useState<ScreenMode>('list')
+  const [editingId,   setEditingId]   = useState<string | null>(null)
+  const [formLoading, setFormLoading] = useState(false)
 
   // Add-product form
   const [name,        setName]        = useState('')
   const [description, setDescription] = useState('')
   const [price,       setPrice]       = useState('')
+  const [category,    setCategory]    = useState<ProductCategory | null>(null)
+  const [condition,   setCondition]   = useState<ProductCondition>('brand_new')
   const [variants,    setVariants]    = useState<VariantDraft[]>(() => [mkVariant()])
   const [imagePicks,  setImagePicks]  = useState<ImagePick[]>([])
   const [saving,      setSaving]      = useState(false)
   const [formError,   setFormError]   = useState<string | null>(null)
+
+  // Edit-mode extras — original variant ids drive the delete diff on save
+  const [originalVariantIds, setOriginalVariantIds] = useState<string[]>([])
+  const [existingImages,     setExistingImages]     = useState<ExistingImage[]>([])
+  const [removedImages,      setRemovedImages]      = useState<ExistingImage[]>([])
 
   // ---- Data loading ----
 
@@ -270,9 +365,15 @@ export default function ProductManagementScreen({ navigation }: Props) {
     setName('')
     setDescription('')
     setPrice('')
+    setCategory(null)
+    setCondition('brand_new')
     setVariants([mkVariant()])
     setImagePicks([])
     setFormError(null)
+    setEditingId(null)
+    setOriginalVariantIds([])
+    setExistingImages([])
+    setRemovedImages([])
   }, [])
 
   const handlePickImage = useCallback(async () => {
@@ -290,14 +391,23 @@ export default function ProductManagementScreen({ navigation }: Props) {
     })
     if (result.canceled) return
     setImagePicks(prev => {
-      const remaining = MAX_PHOTOS - prev.length
+      const remaining = MAX_PHOTOS - existingImages.length - prev.length
       const toAdd = result.assets.slice(0, remaining).map(a => ({ uri: a.uri, key: mkImgKey() }))
       return [...prev, ...toAdd]
     })
-  }, [])
+  }, [existingImages.length])
 
   const removeImage = useCallback((key: string) => {
     setImagePicks(prev => prev.filter(p => p.key !== key))
+  }, [])
+
+  // Stage an already-uploaded photo for deletion — applied on save
+  const removeExistingImage = useCallback((id: string) => {
+    setExistingImages(prev => {
+      const target = prev.find(img => img.id === id)
+      if (target) setRemovedImages(rm => [...rm, target])
+      return prev.filter(img => img.id !== id)
+    })
   }, [])
 
   const openAdd = useCallback(() => {
@@ -305,7 +415,59 @@ export default function ProductManagementScreen({ navigation }: Props) {
     setMode('add')
   }, [resetForm])
 
-  const cancelAdd = useCallback(() => {
+  const openEdit = useCallback(async (productId: string) => {
+    resetForm()
+    setMode('edit')
+    setEditingId(productId)
+    setFormLoading(true)
+
+    const { data, error } = await supabase
+      .from('products')
+      .select(
+        'id, name, description, price_usd, category, condition, product_variants ( id, size, color, color_hex, stock ), product_images ( id, url, position )',
+      )
+      .eq('id', productId)
+      .maybeSingle()
+
+    if (error || !data) {
+      setFormLoading(false)
+      setMode('list')
+      setListError(error?.message ?? 'Could not load that product.')
+      return
+    }
+
+    setName(data.name)
+    setDescription(data.description ?? '')
+    setPrice(String(data.price_usd))
+    setCategory(data.category)
+    setCondition(data.condition)
+
+    const drafts = data.product_variants.map(v =>
+      mkVariant({
+        id: v.id,
+        size: v.size ?? '',
+        color: v.color ?? '',
+        colorHex: v.color_hex ?? '',
+        stock: String(v.stock),
+      }),
+    )
+    setVariants(drafts.length > 0 ? drafts : [mkVariant()])
+    setOriginalVariantIds(data.product_variants.map(v => v.id))
+    setExistingImages([...data.product_images].sort((a, b) => a.position - b.position))
+    setFormLoading(false)
+  }, [resetForm])
+
+  // Deep-link support: ProductManagement can be opened with { productId } to
+  // jump straight into edit mode. Consume the param so re-focus doesn't loop.
+  const routeProductId = route.params?.productId
+  useEffect(() => {
+    if (routeProductId) {
+      navigation.setParams({ productId: undefined })
+      openEdit(routeProductId)
+    }
+  }, [routeProductId, navigation, openEdit])
+
+  const cancelForm = useCallback(() => {
     resetForm()
     setMode('list')
   }, [resetForm])
@@ -313,7 +475,7 @@ export default function ProductManagementScreen({ navigation }: Props) {
   // ---- Variant mutation helpers ----
 
   const updateVariant = useCallback(
-    (key: string, field: keyof Omit<VariantDraft, 'key'>, value: string) => {
+    (key: string, field: keyof Omit<VariantDraft, 'key' | 'id'>, value: string) => {
       setVariants(prev =>
         prev.map(v => v.key === key ? { ...v, [field]: value } : v),
       )
@@ -343,6 +505,10 @@ export default function ProductManagementScreen({ navigation }: Props) {
       setFormError('Enter a price greater than 0.')
       return
     }
+    if (!category) {
+      setFormError('Pick a category so shoppers can find this item.')
+      return
+    }
     if (!storeId) {
       setFormError('Could not find your store. Go back and reopen Inventory.')
       return
@@ -360,7 +526,107 @@ export default function ProductManagementScreen({ navigation }: Props) {
     setSaving(true)
 
     try {
-      // Step A — insert product
+      if (mode === 'edit' && editingId) {
+        // Step A — update the parent product row
+        const { error: updateErr } = await supabase
+          .from('products')
+          .update({
+            name:        name.trim(),
+            description: description.trim() || null,
+            price_usd:   priceNum,
+            category,
+            condition,
+          })
+          .eq('id', editingId)
+        if (updateErr) throw updateErr
+
+        // Step B — reconcile modified existing variants (rows keep their DB id)
+        const existingRows = validVariants.filter(v => v.id)
+        if (existingRows.length > 0) {
+          const { error: upsertErr } = await supabase
+            .from('product_variants')
+            .upsert(
+              existingRows.map(v => ({
+                id:         v.id,
+                product_id: editingId,
+                size:       v.size.trim()     || null,
+                color:      v.color.trim()    || null,
+                color_hex:  v.colorHex.trim() || null,
+                stock:      parseInt(v.stock, 10) || 0,
+              })),
+            )
+          if (upsertErr) throw upsertErr
+        }
+
+        // Step C — insert newly added variant rows
+        const newRows = validVariants.filter(v => !v.id)
+        if (newRows.length > 0) {
+          const { error: insertErr } = await supabase
+            .from('product_variants')
+            .insert(
+              newRows.map(v => ({
+                product_id: editingId,
+                size:       v.size.trim()     || null,
+                color:      v.color.trim()    || null,
+                color_hex:  v.colorHex.trim() || null,
+                stock:      parseInt(v.stock, 10) || 0,
+              })),
+            )
+          if (insertErr) throw insertErr
+        }
+
+        // Step D — delete variants the vendor removed from the list
+        const keptIds = new Set(existingRows.map(v => v.id))
+        const removedIds = originalVariantIds.filter(id => !keptIds.has(id))
+        if (removedIds.length > 0) {
+          const { error: deleteErr } = await supabase
+            .from('product_variants')
+            .delete()
+            .in('id', removedIds)
+          if (deleteErr) {
+            // order_items.variant_id has no cascade — ordered variants can't go
+            if (deleteErr.code === '23503') {
+              throw new Error(
+                'A removed variant already has orders against it, so it can\'t be deleted. Keep the row and set its stock to 0 instead.',
+              )
+            }
+            throw deleteErr
+          }
+        }
+
+        // Step E — remove photos the vendor deleted (rows first, then objects;
+        // an orphaned object without a row is invisible, the reverse is a 404)
+        if (removedImages.length > 0) {
+          const { error: imgDelErr } = await supabase
+            .from('product_images')
+            .delete()
+            .in('id', removedImages.map(img => img.id))
+          if (imgDelErr) throw imgDelErr
+
+          const paths = removedImages
+            .map(img => storagePathFromUrl(img.url))
+            .filter((p): p is string => p !== null)
+          if (paths.length > 0) {
+            await supabase.storage.from('product-images').remove(paths)
+          }
+        }
+
+        // Step F — upload newly added photos after the last surviving position
+        if (imagePicks.length > 0) {
+          const nextPos =
+            existingImages.reduce((max, img) => Math.max(max, img.position), -1) + 1
+          await uploadProductImages(storeId, editingId, imagePicks, nextPos)
+        }
+
+        await load()
+        setMode('list')
+        resetForm()
+        return
+      }
+
+      // Step A — insert product as draft; flipped to active only after
+      // variants + images all land, so a failed step never leaves a broken
+      // listing visible in the shopper feed
       const { data: product, error: productErr } = await supabase
         .from('products')
         .insert({
@@ -368,7 +634,9 @@ export default function ProductManagementScreen({ navigation }: Props) {
           name:        name.trim(),
           description: description.trim() || null,
           price_usd:   priceNum,
-          status:      'active',
+          category,
+          condition,
+          status:      'draft',
         })
         .select('id')
         .single()
@@ -391,27 +659,14 @@ export default function ProductManagementScreen({ navigation }: Props) {
       if (variantsErr) throw variantsErr
 
       // Step C — upload images and record URLs
-      for (let i = 0; i < imagePicks.length; i++) {
-        const pick = imagePicks[i]
-        const ext  = pick.uri.split('.').pop()?.toLowerCase() ?? 'jpg'
-        const path = `${storeId}/${product.id}/${i}-${Date.now()}.${ext}`
+      await uploadProductImages(storeId, product.id, imagePicks, 0)
 
-        const response  = await fetch(pick.uri)
-        const blob      = await response.blob()
-        const { error: uploadErr } = await supabase.storage
-          .from('product-images')
-          .upload(path, blob, { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` })
-        if (uploadErr) throw uploadErr
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('product-images')
-          .getPublicUrl(path)
-
-        const { error: imgRowErr } = await supabase
-          .from('product_images')
-          .insert({ product_id: product.id, url: publicUrl, position: i })
-        if (imgRowErr) throw imgRowErr
-      }
+      // Step D — everything landed; publish
+      const { error: activateErr } = await supabase
+        .from('products')
+        .update({ status: 'active' })
+        .eq('id', product.id)
+      if (activateErr) throw activateErr
 
       // Success — reload list and return to list mode
       await load()
@@ -422,42 +677,48 @@ export default function ProductManagementScreen({ navigation }: Props) {
     } finally {
       setSaving(false)
     }
-  }, [name, price, description, storeId, variants, imagePicks, load, resetForm])
+  }, [name, price, description, category, condition, storeId, variants, imagePicks, mode, editingId, originalVariantIds, existingImages, removedImages, load, resetForm])
 
   // ---- FlatList helpers ----
 
   const renderProduct: ListRenderItem<StoreProduct> = useCallback(
-    ({ item }) => <ProductCard product={item} />,
-    [],
+    ({ item }) => <ProductCard product={item} onEdit={openEdit} />,
+    [openEdit],
   )
 
   const keyExtractor = useCallback((item: StoreProduct) => item.id, [])
 
-  // ---- Render: Add form ----
+  // ---- Render: Add / Edit form ----
 
-  if (mode === 'add') {
+  if (mode !== 'list') {
+    const isEdit = mode === 'edit'
     return (
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView
-          style={styles.flex}
+          style={styles.contentWrap}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          {/* Add header */}
+          {/* Form header */}
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.headerBackBtn}
-              onPress={cancelAdd}
+              onPress={cancelForm}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={styles.headerBackIcon}>←</Text>
             </TouchableOpacity>
             <View style={styles.headerCenter}>
-              <Text style={styles.headerTitle}>New Product</Text>
+              <Text style={styles.headerTitle}>{isEdit ? 'Edit Product' : 'New Product'}</Text>
               <Text style={styles.headerSub}>{storeName}</Text>
             </View>
             <View style={styles.headerRight} />
           </View>
 
+          {formLoading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color="#D9552B" />
+            </View>
+          ) : (
           <ScrollView
             style={styles.flex}
             contentContainerStyle={styles.formScrollContent}
@@ -506,9 +767,58 @@ export default function ProductManagementScreen({ navigation }: Props) {
                 keyboardType="decimal-pad"
                 returnKeyType="next"
               />
+
+              <Text style={styles.inputLabel}>
+                Category <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.categoryRow}>
+                {CATEGORY_OPTIONS.map(opt => {
+                  const active = category === opt.value
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.categoryChip, active && styles.categoryChipActive]}
+                      onPress={() => setCategory(opt.value)}
+                      activeOpacity={0.75}
+                    >
+                      <Text
+                        style={[styles.categoryChipText, active && styles.categoryChipActiveText]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+
+              <Text style={styles.inputLabel}>
+                Condition <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.conditionToggle}>
+                {CONDITION_OPTIONS.map(opt => {
+                  const active = condition === opt.value
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.conditionSegment, active && styles.conditionSegmentActive]}
+                      onPress={() => setCondition(opt.value)}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.conditionSegmentText,
+                          active && styles.conditionSegmentActiveText,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
             </View>
 
-            {/* ── Photos ── */}
+            {/* ── Photos — existing (edit mode) and newly picked share one grid ── */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
                 Photos{' '}
@@ -516,6 +826,19 @@ export default function ProductManagementScreen({ navigation }: Props) {
               </Text>
 
               <View style={styles.photoGrid}>
+                {existingImages.map(img => (
+                  <View key={img.id} style={styles.photoSlot}>
+                    <Image source={{ uri: img.url }} style={styles.photoThumb} resizeMode="cover" />
+                    <TouchableOpacity
+                      style={styles.photoRemoveBtn}
+                      onPress={() => removeExistingImage(img.id)}
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    >
+                      <Text style={styles.photoRemoveText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
                 {imagePicks.map(pick => (
                   <View key={pick.key} style={styles.photoSlot}>
                     <Image source={{ uri: pick.uri }} style={styles.photoThumb} resizeMode="cover" />
@@ -529,7 +852,7 @@ export default function ProductManagementScreen({ navigation }: Props) {
                   </View>
                 ))}
 
-                {imagePicks.length < MAX_PHOTOS && (
+                {existingImages.length + imagePicks.length < MAX_PHOTOS && (
                   <TouchableOpacity
                     style={styles.photoAddSlot}
                     onPress={handlePickImage}
@@ -540,6 +863,13 @@ export default function ProductManagementScreen({ navigation }: Props) {
                   </TouchableOpacity>
                 )}
               </View>
+
+              {isEdit && removedImages.length > 0 && (
+                <Text style={styles.sectionHintPlain}>
+                  {removedImages.length} photo{removedImages.length !== 1 ? 's' : ''} will be
+                  removed when you save.
+                </Text>
+              )}
             </View>
 
             {/* ── Variants ── */}
@@ -574,18 +904,20 @@ export default function ProductManagementScreen({ navigation }: Props) {
               <Text style={styles.formError}>{formError}</Text>
             ) : null}
           </ScrollView>
+          )}
 
           {/* ── Sticky save button ── */}
           <View style={styles.bottomBar}>
             <TouchableOpacity
-              style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+              style={[styles.saveBtn, (saving || formLoading) && styles.saveBtnDisabled]}
               onPress={handleSave}
-              disabled={saving}
+              disabled={saving || formLoading}
               activeOpacity={0.85}
             >
-              <Text style={styles.saveBtnText}>
-                {saving ? 'Saving…' : 'Save Product'}
-              </Text>
+              {saving
+                ? <ActivityIndicator color="#FFFFFF" />
+                : <Text style={styles.saveBtnText}>{isEdit ? 'Update Product' : 'Save Product'}</Text>
+              }
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -597,6 +929,7 @@ export default function ProductManagementScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
+    <View style={styles.contentWrap}>
       {/* List header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -621,9 +954,7 @@ export default function ProductManagementScreen({ navigation }: Props) {
 
       {/* Body */}
       {listLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#C8622A" />
-        </View>
+        <ListSkeleton />
       ) : listError ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{listError}</Text>
@@ -648,6 +979,7 @@ export default function ProductManagementScreen({ navigation }: Props) {
           }
         />
       )}
+    </View>
     </SafeAreaView>
   )
 }
@@ -657,8 +989,15 @@ export default function ProductManagementScreen({ navigation }: Props) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FAF7F2' },
+  safe: { flex: 1, backgroundColor: '#FFFFFF' },
   flex: { flex: 1 },
+  // Cap content at phone scale on wide displays
+  contentWrap: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -671,7 +1010,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D5',
+    borderBottomColor: '#ECE6DC',
   },
   headerBackBtn:  { width: 40, height: 44, justifyContent: 'center' },
   headerBackIcon: { fontSize: 22, color: '#1C1612', lineHeight: 26 },
@@ -692,20 +1031,46 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 14,
     borderRadius: 10,
-    backgroundColor: '#C8622A',
+    backgroundColor: '#D9552B',
     justifyContent: 'center',
     alignItems: 'center',
   },
   addProductBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
   },
   // Product list
   listContent: {
     padding: 16,
     gap: 12,
     flexGrow: 1,
+  },
+  // Loading skeleton rows
+  skeletonRow: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  skeletonThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: 0,
+  },
+  skeletonBody: {
+    flex: 1,
+    padding: 12,
+    gap: 8,
+    justifyContent: 'center',
+  },
+  skeletonLineWide: {
+    width: '70%',
+    height: 12,
+  },
+  skeletonLineNarrow: {
+    width: '40%',
+    height: 10,
   },
   // Product card
   productCard: {
@@ -726,12 +1091,21 @@ const styles = StyleSheet.create({
     height: 80,
   },
   productThumbPlaceholder: {
-    backgroundColor: '#E8E0D5',
+    backgroundColor: '#ECE6DC',
   },
   productCardBody: {
     flex: 1,
     padding: 12,
     gap: 4,
+  },
+  productCardChevron: {
+    justifyContent: 'center',
+    paddingRight: 12,
+  },
+  productCardChevronText: {
+    fontSize: 22,
+    color: '#D9CFC4',
+    fontWeight: '600',
   },
   productCardHeader: {
     flexDirection: 'row',
@@ -748,7 +1122,7 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#C8622A',
+    color: '#D9552B',
   },
   productMeta: {
     flexDirection: 'row',
@@ -757,7 +1131,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F0EBE3',
+    borderTopColor: '#F5EFE6',
   },
   variantCount: {
     fontSize: 12,
@@ -806,16 +1180,21 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: -4,
   },
+  sectionHintPlain: {
+    fontSize: 12,
+    color: '#7A6A5A',
+    lineHeight: 17,
+  },
   // Inputs
   inputLabel: {
     fontSize: 13,
     fontWeight: '600',
     color: '#1C1612',
   },
-  required:      { color: '#C8622A' },
+  required:      { color: '#D9552B' },
   optionalLabel: { fontWeight: '400', color: '#7A6A5A' },
   input: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#D9CFC4',
     borderRadius: 10,
@@ -829,11 +1208,71 @@ const styles = StyleSheet.create({
     minHeight: 88,
     paddingTop: 12,
   },
+  // Category chips
+  categoryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryChip: {
+    height: 40,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#D9CFC4',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoryChipActive: {
+    backgroundColor: '#D9552B',
+    borderColor: '#D9552B',
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7A6A5A',
+  },
+  categoryChipActiveText: {
+    color: '#FFFFFF',
+  },
+  // Condition segmented toggle
+  conditionToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#F5EFE6',
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  conditionSegment: {
+    flex: 1,
+    height: 40,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  conditionSegmentActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#1C1612',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  conditionSegmentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7A6A5A',
+  },
+  conditionSegmentActiveText: {
+    color: '#1C1612',
+    fontWeight: '700',
+  },
   // Variant card
   variantCard: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E8E0D5',
+    borderColor: '#ECE6DC',
     borderRadius: 10,
     padding: 12,
     gap: 8,
@@ -854,7 +1293,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#F0EBE3',
+    backgroundColor: '#F5EFE6',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -932,7 +1371,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#D9CFC4',
     borderStyle: 'dashed',
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 2,
@@ -965,7 +1404,7 @@ const styles = StyleSheet.create({
   // Inline form error
   formError: {
     fontSize: 13,
-    color: '#C8622A',
+    color: '#D9552B',
     textAlign: 'center',
     paddingHorizontal: 8,
   },
@@ -974,13 +1413,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 16,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E8E0D5',
+    borderTopColor: '#ECE6DC',
   },
   saveBtn: {
-    backgroundColor: '#C8622A',
-    borderRadius: 12,
+    backgroundColor: '#D9552B',
+    borderRadius: 28,
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
@@ -989,7 +1428,7 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
     letterSpacing: 0.3,
   },
   // Empty / error states
@@ -1013,7 +1452,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#C8622A',
+    color: '#D9552B',
     textAlign: 'center',
     paddingHorizontal: 32,
     marginBottom: 16,
@@ -1023,13 +1462,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
     justifyContent: 'center',
     alignItems: 'center',
   },
   retryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#C8622A',
+    color: '#D9552B',
   },
 })

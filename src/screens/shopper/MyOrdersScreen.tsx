@@ -6,6 +6,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -28,8 +29,9 @@ const fetchMyOrders = (userId: string) =>
   supabase
     .from('orders')
     .select(`
-      id, order_number, status, total_usd, created_at,
+      id, order_number, status, total_usd, created_at, store_id,
       stores ( name ),
+      reviews ( id ),
       order_items (
         quantity,
         product:products ( name )
@@ -96,20 +98,103 @@ function buildItemSnippet(items: OrderItem[]): string {
 }
 
 // ---------------------------------------------------------------------------
+// ReviewBlock — inline star-rating form shown on delivered, unreviewed orders
+// ---------------------------------------------------------------------------
+
+type ReviewBlockProps = {
+  orderId:   string
+  storeId:   string
+  shopperId: string
+  onDone:    (orderId: string) => void
+}
+
+function ReviewBlock({ orderId, storeId, shopperId, onDone }: ReviewBlockProps) {
+  const [rating,     setRating]     = useState(0)
+  const [comment,    setComment]    = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error,      setError]      = useState<string | null>(null)
+
+  const handleSubmit = useCallback(async () => {
+    if (rating === 0 || submitting) return
+    setSubmitting(true)
+    setError(null)
+    const { error: insertErr } = await supabase.from('reviews').insert({
+      order_id:   orderId,
+      store_id:   storeId,
+      shopper_id: shopperId,
+      rating,
+      comment: comment.trim() || null,
+    })
+    if (insertErr) {
+      setError(insertErr.message)
+      setSubmitting(false)
+      return
+    }
+    onDone(orderId)
+  }, [rating, comment, submitting, orderId, storeId, shopperId, onDone])
+
+  return (
+    <View style={styles.reviewBlock}>
+      <Text style={styles.reviewPromptLabel}>How was this order?</Text>
+      <View style={styles.starRow}>
+        {[1, 2, 3, 4, 5].map(n => (
+          <TouchableOpacity
+            key={n}
+            onPress={() => setRating(n)}
+            hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+            activeOpacity={0.7}
+          >
+            <Text style={n <= rating ? styles.starFilled : styles.starEmpty}>★</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {rating > 0 && (
+        <>
+          <TextInput
+            style={styles.reviewInput}
+            value={comment}
+            onChangeText={setComment}
+            placeholder="Add a comment (optional)"
+            placeholderTextColor="#B0A090"
+            multiline
+          />
+          {error ? <Text style={styles.reviewError}>{error}</Text> : null}
+          <TouchableOpacity
+            style={[styles.reviewSubmitBtn, submitting && styles.reviewSubmitBtnDisabled]}
+            onPress={handleSubmit}
+            disabled={submitting}
+            activeOpacity={0.85}
+          >
+            {submitting
+              ? <ActivityIndicator size="small" color="#FFFFFF" />
+              : <Text style={styles.reviewSubmitText}>Submit Review</Text>
+            }
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // OrderCard — entire card is a tap target
 // ---------------------------------------------------------------------------
 
 type CardProps = {
-  order:    MyOrder
-  onPress:  (orderId: string) => void
+  order:      MyOrder
+  shopperId:  string
+  reviewed:   boolean
+  onPress:    (orderId: string) => void
+  onReviewed: (orderId: string) => void
 }
 
-function OrderCard({ order, onPress }: CardProps) {
+function OrderCard({ order, shopperId, reviewed, onPress, onReviewed }: CardProps) {
   const badge     = STATUS_BADGE[order.status]
   const storeName = resolveStoreName(order.stores)
   const snippet   = buildItemSnippet(order.order_items)
   const isActive  = ACTIVE_STATUSES.includes(order.status)
   const ctaLabel  = isActive ? 'Track Order →' : 'View Details →'
+  const canReview = order.status === 'delivered' && !reviewed
 
   return (
     <TouchableOpacity
@@ -149,6 +234,19 @@ function OrderCard({ order, onPress }: CardProps) {
           {ctaLabel}
         </Text>
       </View>
+
+      {/* ── Review: prompt on delivered orders, thanks once submitted ── */}
+      {canReview && (
+        <ReviewBlock
+          orderId={order.id}
+          storeId={order.store_id}
+          shopperId={shopperId}
+          onDone={onReviewed}
+        />
+      )}
+      {order.status === 'delivered' && reviewed && (
+        <Text style={styles.reviewedHint}>★ Thanks for your review</Text>
+      )}
     </TouchableOpacity>
   )
 }
@@ -160,10 +258,12 @@ function OrderCard({ order, onPress }: CardProps) {
 export default function MyOrdersScreen({ navigation }: Props) {
   const user = useAuthStore((s) => s.user)
 
-  const [orders,     setOrders]     = useState<MyOrder[]>([])
-  const [loading,    setLoading]    = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error,      setError]      = useState<string | null>(null)
+  const [orders,      setOrders]      = useState<MyOrder[]>([])
+  const [loading,     setLoading]     = useState(true)
+  const [refreshing,  setRefreshing]  = useState(false)
+  const [error,       setError]       = useState<string | null>(null)
+  // Orders reviewed in this session — merged with the reviews embed on fetch
+  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set())
 
   const load = useCallback(async (isRefresh = false) => {
     if (!user?.id) return
@@ -216,9 +316,32 @@ export default function MyOrdersScreen({ navigation }: Props) {
     [navigation],
   )
 
+  const handleReviewed = useCallback((orderId: string) => {
+    setReviewedIds(prev => new Set(prev).add(orderId))
+  }, [])
+
+  // PostgREST returns the one-to-one reviews embed as object or array
+  // depending on client version — treat any non-empty value as reviewed
+  const hasReview = useCallback(
+    (order: MyOrder): boolean => {
+      if (reviewedIds.has(order.id)) return true
+      const r = order.reviews as unknown
+      return Array.isArray(r) ? r.length > 0 : r != null
+    },
+    [reviewedIds],
+  )
+
   const renderItem: ListRenderItem<MyOrder> = useCallback(
-    ({ item }) => <OrderCard order={item} onPress={handlePressOrder} />,
-    [handlePressOrder],
+    ({ item }) => (
+      <OrderCard
+        order={item}
+        shopperId={user?.id ?? ''}
+        reviewed={hasReview(item)}
+        onPress={handlePressOrder}
+        onReviewed={handleReviewed}
+      />
+    ),
+    [handlePressOrder, handleReviewed, hasReview, user?.id],
   )
 
   const keyExtractor = useCallback((item: MyOrder) => item.id, [])
@@ -228,7 +351,7 @@ export default function MyOrdersScreen({ navigation }: Props) {
   if (loading) {
     return (
       <SafeAreaView style={[styles.safe, styles.centered]}>
-        <ActivityIndicator size="large" color="#C8622A" />
+        <ActivityIndicator size="large" color="#D9552B" />
       </SafeAreaView>
     )
   }
@@ -260,8 +383,8 @@ export default function MyOrdersScreen({ navigation }: Props) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor="#C8622A"
-            colors={['#C8622A']}
+            tintColor="#D9552B"
+            colors={['#D9552B']}
           />
         }
         ListHeaderComponent={
@@ -296,7 +419,7 @@ export default function MyOrdersScreen({ navigation }: Props) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  safe:     { flex: 1, backgroundColor: '#FAF7F2' },
+  safe:     { flex: 1, backgroundColor: '#FFFFFF' },
   centered: { justifyContent: 'center', alignItems: 'center' },
 
   // Header inside FlatList
@@ -394,7 +517,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F0EBE3',
+    borderTopColor: '#F5EFE6',
     minHeight: 44,
   },
   total: {
@@ -408,8 +531,72 @@ const styles = StyleSheet.create({
     color: '#7A6A5A',
   },
   ctaActive: {
-    color: '#C8622A',
+    color: '#D9552B',
     fontWeight: '700',
+  },
+
+  // Review block
+  reviewBlock: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F5EFE6',
+    gap: 8,
+  },
+  reviewPromptLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1C1612',
+  },
+  starRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  starFilled: {
+    fontSize: 26,
+    color: '#D9552B',
+  },
+  starEmpty: {
+    fontSize: 26,
+    color: '#D9CFC4',
+  },
+  reviewInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#D9CFC4',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#1C1612',
+    minHeight: 64,
+    textAlignVertical: 'top',
+  },
+  reviewError: {
+    fontSize: 12,
+    color: '#D9552B',
+  },
+  reviewSubmitBtn: {
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#D9552B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reviewSubmitBtnDisabled: { opacity: 0.5 },
+  reviewSubmitText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  reviewedHint: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F5EFE6',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2D7A4F',
   },
 
   // Empty state
@@ -439,7 +626,7 @@ const styles = StyleSheet.create({
   // Error state
   errorText: {
     fontSize: 14,
-    color: '#C8622A',
+    color: '#D9552B',
     textAlign: 'center',
     paddingHorizontal: 32,
     marginBottom: 16,
@@ -449,13 +636,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
     justifyContent: 'center',
     alignItems: 'center',
   },
   retryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#C8622A',
+    color: '#D9552B',
   },
 })

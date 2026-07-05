@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { useAuthStore } from '../../store/useAuthStore'
 import { useCartStore, CartItem } from '../../store/useCartStore'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
 
@@ -113,6 +114,7 @@ function CartItemRow({ item, onUpdateQty, onRemove }: RowProps) {
 // ---------------------------------------------------------------------------
 
 export default function CartScreen({ navigation }: Props) {
+  const session = useAuthStore((s) => s.session)
   const items = useCartStore((s) => s.items)
   const updateQuantity = useCartStore((s) => s.updateQuantity)
   const removeItem = useCartStore((s) => s.removeItem)
@@ -213,13 +215,18 @@ export default function CartScreen({ navigation }: Props) {
           <Text style={styles.subtotalLabel}>Subtotal</Text>
           <Text style={styles.subtotalValue}>${subtotal.toFixed(2)} USD</Text>
         </View>
+        {session === null && totalQty > 0 && (
+          <Text style={styles.guestHint}>Sign in to place your order — your bag is saved.</Text>
+        )}
         <TouchableOpacity
           style={[styles.checkoutBtn, totalQty === 0 && styles.checkoutBtnDisabled]}
-          onPress={() => navigation.navigate('Checkout')}
+          onPress={() => navigation.navigate(session === null ? 'Login' : 'Checkout')}
           disabled={totalQty === 0}
           activeOpacity={0.85}
         >
-          <Text style={styles.checkoutBtnText}>Proceed to Checkout</Text>
+          <Text style={styles.checkoutBtnText}>
+            {session === null ? 'Sign in to Checkout' : 'Proceed to Checkout'}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -233,7 +240,7 @@ export default function CartScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
   },
   // Header
   header: {
@@ -242,7 +249,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D5',
+    borderBottomColor: '#ECE6DC',
   },
   backBtn: {
     width: 40,
@@ -270,7 +277,7 @@ const styles = StyleSheet.create({
     minWidth: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#C8622A',
+    backgroundColor: '#D9552B',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 6,
@@ -278,7 +285,7 @@ const styles = StyleSheet.create({
   countBadgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
   },
   headerRight: {
     width: 40,
@@ -308,7 +315,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   thumbPlaceholder: {
-    backgroundColor: '#E8E0D5',
+    backgroundColor: '#ECE6DC',
   },
   itemBody: {
     flex: 1,
@@ -341,7 +348,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    backgroundColor: '#F0EBE3',
+    backgroundColor: '#F5EFE6',
   },
   chipText: {
     fontSize: 11,
@@ -365,7 +372,7 @@ const styles = StyleSheet.create({
   itemPrice: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#C8622A',
+    color: '#D9552B',
   },
   stepper: {
     flexDirection: 'row',
@@ -400,7 +407,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#F0EBE3',
+    backgroundColor: '#F5EFE6',
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'flex-start',
@@ -441,21 +448,21 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
   },
   browseBtnText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#C8622A',
+    color: '#D9552B',
   },
   // Sticky bottom bar
   bottomBar: {
     paddingHorizontal: 20,
     paddingTop: 14,
     paddingBottom: 16,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E8E0D5',
+    borderTopColor: '#ECE6DC',
     gap: 14,
   },
   subtotalRow: {
@@ -473,9 +480,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1C1612',
   },
+  guestHint: {
+    fontSize: 12,
+    color: '#7A6A5A',
+    textAlign: 'center',
+    marginTop: -6,
+  },
   checkoutBtn: {
-    backgroundColor: '#C8622A',
-    borderRadius: 12,
+    backgroundColor: '#D9552B',
+    borderRadius: 28,
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
@@ -486,7 +499,7 @@ const styles = StyleSheet.create({
   checkoutBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
     letterSpacing: 0.3,
   },
 })

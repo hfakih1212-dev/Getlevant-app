@@ -1,7 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import {
-  ActivityIndicator,
-  Dimensions,
   FlatList,
   ListRenderItem,
   RefreshControl,
@@ -10,13 +8,16 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { LinearGradient } from 'expo-linear-gradient'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import ConditionBadge from '../../components/ConditionBadge'
+import Skeleton from '../../components/Skeleton'
+import { CATEGORY_OPTIONS, LEBANON_REGIONS, LebanonRegion, ProductCategory } from '../../lib/catalog'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useCartStore } from '../../store/useCartStore'
@@ -36,6 +37,8 @@ const fetchFeed = () =>
       id,
       name,
       price_usd,
+      category,
+      condition,
       stores!inner ( name, region ),
       product_images ( url, position ),
       product_variants ( size, color, color_hex, stock )
@@ -60,31 +63,15 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// Region filter constants
-// ---------------------------------------------------------------------------
-
-const ALL_REGIONS = [
-  'Beirut',
-  'Mount Lebanon',
-  'North',
-  'South',
-  'Bekaa',
-  'Nabatieh',
-  'Akkar',
-  'Baalbek-Hermel',
-] as const
-
-type LebanonRegion = typeof ALL_REGIONS[number]
-
-// ---------------------------------------------------------------------------
 // Layout constants  (8pt grid)
 // ---------------------------------------------------------------------------
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window')
-const H_PAD      = 16
-const COL_GAP    = 10
-const CARD_WIDTH = (SCREEN_WIDTH - H_PAD * 2 - COL_GAP) / 2
-const IMAGE_HEIGHT = CARD_WIDTH * 1.25   // 4:5 portrait — premium product feel
+const H_PAD   = 16
+const COL_GAP = 10
+// Content never grows past phone scale — wide displays get a centered column
+const MAX_CONTENT_WIDTH = 560
+const IMAGE_RATIO       = 1.25   // 4:5 portrait — premium product feel
+const SKELETON_COUNT    = 6
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -99,9 +86,14 @@ function resolveStore(stores: FeedProduct['stores']): { name: string; region: st
 // ProductCard
 // ---------------------------------------------------------------------------
 
-type CardProps = { item: FeedProduct; onPress: (item: FeedProduct) => void }
+type CardProps = {
+  item: FeedProduct
+  cardWidth: number
+  imageHeight: number
+  onPress: (item: FeedProduct) => void
+}
 
-function ProductCard({ item, onPress }: CardProps) {
+const ProductCard = React.memo(function ProductCard({ item, cardWidth, imageHeight, onPress }: CardProps) {
   const images = Array.isArray(item.product_images) ? item.product_images : []
   const coverUrl = [...images].sort((a, b) => a.position - b.position)[0]?.url ?? null
 
@@ -110,12 +102,12 @@ function ProductCard({ item, onPress }: CardProps) {
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, { width: cardWidth }]}
       onPress={() => onPress(item)}
-      activeOpacity={0.92}
+      activeOpacity={0.85}
     >
-      {/* Image + gradient overlay */}
-      <View style={styles.imageContainer}>
+      {/* Rounded standalone image — flat, image-first card */}
+      <View style={[styles.imageContainer, { height: imageHeight }]}>
         {coverUrl ? (
           <Image
             source={{ uri: coverUrl }}
@@ -124,15 +116,10 @@ function ProductCard({ item, onPress }: CardProps) {
             transition={200}
           />
         ) : (
-          <View style={[styles.cardImage, styles.imagePlaceholder]} />
+          <View style={styles.cardImage} />
         )}
-        <LinearGradient
-          colors={['transparent', 'rgba(28,22,18,0.62)']}
-          style={styles.imageGradient}
-        />
-        {/* Price badge pinned to bottom-right of image */}
-        <View style={styles.priceBadge}>
-          <Text style={styles.priceBadgeText}>{price}</Text>
+        <View style={styles.cardBadge}>
+          <ConditionBadge condition={item.condition} />
         </View>
       </View>
 
@@ -142,8 +129,29 @@ function ProductCard({ item, onPress }: CardProps) {
           <Text style={styles.storeName} numberOfLines={1}>{store.name}</Text>
         ) : null}
         <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.price}>{price}</Text>
       </View>
     </TouchableOpacity>
+  )
+})
+
+// ---------------------------------------------------------------------------
+// FeedSkeleton — pulsing placeholder grid shown while the feed loads
+// ---------------------------------------------------------------------------
+
+function FeedSkeleton({ cardWidth, imageHeight }: { cardWidth: number; imageHeight: number }) {
+  return (
+    <View style={styles.skeletonGrid}>
+      {Array.from({ length: SKELETON_COUNT }, (_, i) => (
+        <View key={i} style={[styles.skeletonCard, { width: cardWidth }]}>
+          <Skeleton style={[styles.skeletonImage, { height: imageHeight }]} />
+          <View style={styles.skeletonInfo}>
+            <Skeleton style={styles.skeletonLineShort} />
+            <Skeleton style={styles.skeletonLineLong} />
+          </View>
+        </View>
+      ))}
+    </View>
   )
 }
 
@@ -153,16 +161,25 @@ function ProductCard({ item, onPress }: CardProps) {
 
 export default function MarketplaceFeedScreen({ navigation }: Props) {
   const user      = useAuthStore(s => s.user)
+  const session   = useAuthStore(s => s.session)
   const initial   = (user?.phone ?? user?.email ?? '?').replace(/^\+/, '').charAt(0).toUpperCase()
   const cartCount = useCartStore(s => s.items.reduce((sum, i) => sum + i.quantity, 0))
+
+  // Card size tracks the window so the grid stays fluid on rotation and
+  // never balloons on tablets / web — content is capped and centered instead.
+  const { width: windowWidth } = useWindowDimensions()
+  const gridWidth   = Math.min(windowWidth, MAX_CONTENT_WIDTH)
+  const cardWidth   = (gridWidth - H_PAD * 2 - COL_GAP) / 2
+  const imageHeight = cardWidth * IMAGE_RATIO
 
   const [products,       setProducts]       = useState<FeedProduct[]>([])
   const [loading,        setLoading]        = useState(true)
   const [refreshing,     setRefreshing]     = useState(false)
   const [error,          setError]          = useState<string | null>(null)
-  const [searchText,     setSearchText]     = useState('')
-  const [selectedRegion, setSelectedRegion] = useState<LebanonRegion | null>(null)
-  const [sortBy,         setSortBy]         = useState<SortOption>('newest')
+  const [searchText,       setSearchText]       = useState('')
+  const [selectedRegion,   setSelectedRegion]   = useState<LebanonRegion | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<ProductCategory | null>(null)
+  const [sortBy,           setSortBy]           = useState<SortOption>('newest')
 
   // ---- Fetch ----
 
@@ -191,6 +208,10 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
   const filteredProducts = useMemo(() => {
     let result = products
 
+    if (selectedCategory) {
+      result = result.filter(p => p.category === selectedCategory)
+    }
+
     if (selectedRegion) {
       result = result.filter(p => {
         const r = resolveStore(p.stores)?.region
@@ -213,7 +234,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
     }
 
     return result
-  }, [products, searchText, selectedRegion, sortBy])
+  }, [products, searchText, selectedRegion, selectedCategory, sortBy])
 
   // ---- Handlers ----
 
@@ -226,44 +247,40 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
     setSelectedRegion(prev => (prev === region ? null : region))
   }, [])
 
+  const handleCategoryPress = useCallback((category: ProductCategory | null) => {
+    setSelectedCategory(prev => (prev === category ? null : category))
+  }, [])
+
   const clearFilters = useCallback(() => {
     setSearchText('')
     setSelectedRegion(null)
+    setSelectedCategory(null)
     setSortBy('newest')
   }, [])
 
   const renderItem: ListRenderItem<FeedProduct> = useCallback(
-    ({ item }) => <ProductCard item={item} onPress={handlePress} />,
-    [handlePress],
+    ({ item }) => (
+      <ProductCard
+        item={item}
+        cardWidth={cardWidth}
+        imageHeight={imageHeight}
+        onPress={handlePress}
+      />
+    ),
+    [handlePress, cardWidth, imageHeight],
   )
 
   const keyExtractor = useCallback((item: FeedProduct) => item.id, [])
 
-  const isFiltering = searchText.trim().length > 0 || selectedRegion !== null || sortBy !== 'newest'
-
-  // ---- Loading / error ----
-
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.safe, styles.centered]}>
-        <ActivityIndicator size="large" color="#C8622A" />
-      </SafeAreaView>
-    )
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={[styles.safe, styles.centered]}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={() => load()} activeOpacity={0.8}>
-          <Text style={styles.retryBtnText}>Retry</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    )
-  }
+  const isFiltering =
+    searchText.trim().length > 0 ||
+    selectedRegion !== null ||
+    selectedCategory !== null ||
+    sortBy !== 'newest'
 
   return (
     <SafeAreaView style={styles.safe}>
+    <View style={styles.contentWrap}>
 
       {/* ── Header ── */}
       <View style={styles.header}>
@@ -272,13 +289,15 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
           <Text style={styles.brandSub}>Local boutiques, delivered</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => navigation.navigate('MyOrders')}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.iconBtnText}>📋</Text>
-          </TouchableOpacity>
+          {session !== null && (
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => navigation.navigate('MyOrders')}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.iconBtnText}>📋</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={() => navigation.navigate('Cart')}
@@ -291,13 +310,23 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.avatarBtn}
-            onPress={() => navigation.navigate('Profile')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.avatarBtnText}>{initial}</Text>
-          </TouchableOpacity>
+          {session !== null ? (
+            <TouchableOpacity
+              style={styles.avatarBtn}
+              onPress={() => navigation.navigate('Profile')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.avatarBtnText}>{initial}</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.signInBtn}
+              onPress={() => navigation.navigate('Login')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.signInBtnText}>Sign in</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -318,6 +347,44 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
           />
         </View>
       </View>
+
+      {/* ── Category strip ── */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoryStrip}
+        style={styles.categoryBar}
+      >
+        <TouchableOpacity
+          style={[styles.categoryPill, selectedCategory === null && styles.categoryPillActive]}
+          onPress={() => setSelectedCategory(null)}
+          activeOpacity={0.75}
+        >
+          <Text
+            style={[
+              styles.categoryPillText,
+              selectedCategory === null && styles.categoryPillActiveText,
+            ]}
+          >
+            All
+          </Text>
+        </TouchableOpacity>
+        {CATEGORY_OPTIONS.map(opt => {
+          const active = selectedCategory === opt.value
+          return (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.categoryPill, active && styles.categoryPillActive]}
+              onPress={() => handleCategoryPress(opt.value)}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.categoryPillText, active && styles.categoryPillActiveText]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          )
+        })}
+      </ScrollView>
 
       {/* ── Sort + Region strip ── */}
       <ScrollView
@@ -347,7 +414,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
         <View style={styles.pillDivider} />
 
         {/* Region pills */}
-        {ALL_REGIONS.map(region => {
+        {LEBANON_REGIONS.map(region => {
           const active = selectedRegion === region
           return (
             <TouchableOpacity
@@ -364,42 +431,54 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
         })}
       </ScrollView>
 
-      {/* ── Product grid ── */}
-      <FlatList
-        data={filteredProducts}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        numColumns={2}
-        contentContainerStyle={styles.listContent}
-        columnWrapperStyle={styles.columnWrapper}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor="#C8622A"
-            colors={['#C8622A']}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>🛍</Text>
-            <Text style={styles.emptyTitle}>
-              {isFiltering ? 'No matches' : 'Nothing here yet'}
-            </Text>
-            <Text style={styles.emptyBody}>
-              {isFiltering
-                ? 'Try a different search or region.'
-                : 'New boutiques are joining Souk every day.'}
-            </Text>
-            {isFiltering && (
-              <TouchableOpacity style={styles.clearBtn} onPress={clearFilters} activeOpacity={0.8}>
-                <Text style={styles.clearBtnText}>Clear filters</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        }
-      />
+      {/* ── Body: skeleton grid / error / product grid ── */}
+      {loading ? (
+        <FeedSkeleton cardWidth={cardWidth} imageHeight={imageHeight} />
+      ) : error ? (
+        <View style={styles.errorState}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => load()} activeOpacity={0.8}>
+            <Text style={styles.retryBtnText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredProducts}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          numColumns={2}
+          contentContainerStyle={styles.listContent}
+          columnWrapperStyle={styles.columnWrapper}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#D9552B"
+              colors={['#D9552B']}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>🛍</Text>
+              <Text style={styles.emptyTitle}>
+                {isFiltering ? 'No matches' : 'Nothing here yet'}
+              </Text>
+              <Text style={styles.emptyBody}>
+                {isFiltering
+                  ? 'Try a different search, category, or region.'
+                  : 'New boutiques are joining Souk every day.'}
+              </Text>
+              {isFiltering && (
+                <TouchableOpacity style={styles.clearBtn} onPress={clearFilters} activeOpacity={0.8}>
+                  <Text style={styles.clearBtnText}>Clear filters</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          }
+        />
+      )}
+    </View>
     </SafeAreaView>
   )
 }
@@ -411,11 +490,13 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
   },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
+  contentWrap: {
+    flex: 1,
+    width: '100%',
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: 'center',
   },
 
   // ── Header ──
@@ -448,7 +529,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F0EBE3',
+    backgroundColor: '#F5EFE6',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -460,7 +541,7 @@ const styles = StyleSheet.create({
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#C8622A',
+    backgroundColor: '#D9552B',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 3,
@@ -468,7 +549,7 @@ const styles = StyleSheet.create({
   cartBadgeText: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
     lineHeight: 11,
   },
   avatarBtn: {
@@ -482,7 +563,20 @@ const styles = StyleSheet.create({
   avatarBtnText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
+  },
+  signInBtn: {
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#1C1612',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  signInBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 
   // ── Search ──
@@ -494,10 +588,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: '#E8E0D5',
-    paddingHorizontal: 14,
+    borderColor: '#ECE6DC',
+    paddingHorizontal: 16,
     height: 48,
     gap: 8,
     shadowColor: '#1C1612',
@@ -517,10 +611,43 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
 
+  // ── Category strip ──
+  categoryBar: {
+    flexGrow: 0,
+  },
+  categoryStrip: {
+    paddingHorizontal: H_PAD,
+    paddingBottom: 10,
+    gap: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  categoryPill: {
+    height: 36,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    backgroundColor: '#F5EFE6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoryPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7A6A5A',
+  },
+  categoryPillActive: {
+    backgroundColor: '#D9552B',
+  },
+  categoryPillActiveText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+
   // ── Filter strip (sort + region combined) ──
   filterBar: {
+    flexGrow: 0,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D5',
+    borderBottomColor: '#ECE6DC',
     marginBottom: 2,
   },
   filterStrip: {
@@ -536,7 +663,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#D9CFC4',
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -550,14 +677,14 @@ const styles = StyleSheet.create({
     borderColor: '#1C1612',
   },
   pillSortActiveText: {
-    color: '#FAF7F2',
+    color: '#FFFFFF',
   },
   pillRegionActive: {
-    backgroundColor: '#C8622A',
-    borderColor: '#C8622A',
+    backgroundColor: '#D9552B',
+    borderColor: '#D9552B',
   },
   pillRegionActiveText: {
-    color: '#FAF7F2',
+    color: '#FFFFFF',
   },
   pillDivider: {
     width: 1,
@@ -575,71 +702,51 @@ const styles = StyleSheet.create({
   },
   columnWrapper: {
     justifyContent: 'space-between',
-    marginBottom: COL_GAP,
+    marginBottom: 18,
   },
 
-  // ── Product card ──
+  // ── Product card (flat, image-first) ──
   card: {
-    width: CARD_WIDTH,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-    shadowColor: '#1C1612',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.09,
-    shadowRadius: 12,
-    elevation: 3,
+    backgroundColor: 'transparent',
   },
   imageContainer: {
-    width: CARD_WIDTH,
-    height: IMAGE_HEIGHT,
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#F0E9DF',
   },
   cardImage: {
-    width: CARD_WIDTH,
-    height: IMAGE_HEIGHT,
+    width: '100%',
+    height: '100%',
   },
-  imagePlaceholder: {
-    backgroundColor: '#EDE6DC',
-  },
-  imageGradient: {
+  cardBadge: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: IMAGE_HEIGHT * 0.45,
-  },
-  priceBadge: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  priceBadgeText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#1C1612',
+    top: 8,
+    left: 8,
   },
   cardInfo: {
-    paddingHorizontal: 11,
-    paddingTop: 9,
-    paddingBottom: 11,
-    gap: 3,
+    paddingHorizontal: 2,
+    paddingTop: 8,
+    gap: 2,
   },
   storeName: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#C8622A',
+    color: '#D9552B',
     textTransform: 'uppercase',
     letterSpacing: 0.7,
   },
   productName: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#1C1612',
     lineHeight: 18,
+  },
+  price: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1C1612',
+    marginTop: 2,
   },
 
   // ── Empty state ──
@@ -678,13 +785,48 @@ const styles = StyleSheet.create({
   clearBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
+  },
+
+  // ── Skeleton grid ──
+  skeletonGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: H_PAD,
+    paddingTop: 16,
+  },
+  skeletonCard: {
+    marginBottom: 18,
+  },
+  skeletonImage: {
+    width: '100%',
+    borderRadius: 16,
+  },
+  skeletonInfo: {
+    paddingHorizontal: 2,
+    paddingTop: 8,
+    gap: 6,
+  },
+  skeletonLineShort: {
+    width: '45%',
+    height: 10,
+  },
+  skeletonLineLong: {
+    width: '85%',
+    height: 12,
   },
 
   // ── Error ──
+  errorState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   errorText: {
     fontSize: 14,
-    color: '#C8622A',
+    color: '#D9552B',
     textAlign: 'center',
     paddingHorizontal: 32,
     marginBottom: 16,
@@ -700,6 +842,6 @@ const styles = StyleSheet.create({
   retryBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
   },
 })

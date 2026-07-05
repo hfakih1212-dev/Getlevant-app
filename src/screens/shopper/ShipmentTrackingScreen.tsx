@@ -180,13 +180,13 @@ const tlStyles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   dotLatest: {
-    borderColor: '#C8622A',
-    backgroundColor: '#C8622A',
+    borderColor: '#D9552B',
+    backgroundColor: '#D9552B',
   },
   line: {
     width: LINE_WIDTH,
     flex: 1,
-    backgroundColor: '#E8E0D5',
+    backgroundColor: '#ECE6DC',
     marginTop: 3,
     minHeight: 24,
   },
@@ -317,7 +317,7 @@ export default function ShipmentTrackingScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <SafeAreaView style={[styles.safe, styles.centered]}>
-        <ActivityIndicator size="large" color="#C8622A" />
+        <ActivityIndicator size="large" color="#D9552B" />
       </SafeAreaView>
     )
   }
@@ -461,7 +461,7 @@ export default function ShipmentTrackingScreen({ route, navigation }: Props) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: '#FAF7F2' },
+  safe:    { flex: 1, backgroundColor: '#FFFFFF' },
   centered: { justifyContent: 'center', alignItems: 'center' },
   // Header
   header: {
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D5',
+    borderBottomColor: '#ECE6DC',
   },
   backBtn:      { width: 40, height: 44, justifyContent: 'center' },
   backIcon:     { fontSize: 22, color: '#1C1612', lineHeight: 26 },
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   trackingId: {
-    color: '#C8622A',
+    color: '#D9552B',
     fontWeight: '700',
     letterSpacing: 0.5,
   },
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
   // Error
   errorText: {
     fontSize: 14,
-    color: '#C8622A',
+    color: '#D9552B',
     textAlign: 'center',
     paddingHorizontal: 32,
     marginBottom: 16,
@@ -601,13 +601,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
     justifyContent: 'center',
     alignItems: 'center',
   },
   retryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#C8622A',
+    color: '#D9552B',
   },
 })

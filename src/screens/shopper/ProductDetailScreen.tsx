@@ -13,6 +13,9 @@ import {
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import ConditionBadge from '../../components/ConditionBadge'
+import { CATEGORY_LABEL } from '../../lib/catalog'
+import { productLink, shareLink } from '../../lib/share'
 import { supabase } from '../../lib/supabase'
 import { useCartStore } from '../../store/useCartStore'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
@@ -31,8 +34,8 @@ const fetchProduct = (id: string) =>
     .from('products')
     .select(
       `
-      id, name, description, price_usd, store_id,
-      stores ( name, region, whatsapp ),
+      id, name, description, price_usd, store_id, category, condition,
+      stores ( name, description, region, whatsapp, rating ),
       product_images ( id, url, position ),
       product_variants ( id, size, color, color_hex, stock )
     `,
@@ -42,7 +45,13 @@ const fetchProduct = (id: string) =>
 
 type ProductDetail = NonNullable<Awaited<ReturnType<typeof fetchProduct>>['data']>
 type Variant = ProductDetail['product_variants'][0]
-type StoreShape = { name: string; region: string | null; whatsapp: string | null }
+type StoreShape = {
+  name: string
+  description: string | null
+  region: string | null
+  whatsapp: string | null
+  rating: number | null
+}
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -160,6 +169,7 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
 
   const addItem = useCartStore((s) => s.addItem)
   const [added, setAdded] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   // ---- Handlers ----
 
@@ -207,12 +217,25 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
     setTimeout(() => navigation.goBack(), 1200)
   }, [addItem, product, selectedVariant, store, images, navigation, added])
 
+  const handleShare = useCallback(async () => {
+    if (!product) return
+    const price = `$${Number(product.price_usd).toFixed(0)}`
+    const message = store
+      ? `${product.name} — ${price} at ${store.name} on Souk`
+      : `${product.name} — ${price} on Souk`
+    const outcome = await shareLink(message, productLink(product.id))
+    if (outcome === 'copied') {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    }
+  }, [product, store])
+
   // ---- Loading / error guards ----
 
   if (loading) {
     return (
       <SafeAreaView style={[styles.safe, styles.centered]}>
-        <ActivityIndicator size="large" color="#C8622A" />
+        <ActivityIndicator size="large" color="#D9552B" />
       </SafeAreaView>
     )
   }
@@ -265,6 +288,22 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
             </View>
           </TouchableOpacity>
 
+          {/* Share button — mirrors the back button on the right edge */}
+          <TouchableOpacity
+            style={[styles.shareBtn, { top: insets.top + 8 }]}
+            onPress={handleShare}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View style={styles.backBtnInner}>
+              <Text style={styles.shareBtnText}>↗</Text>
+            </View>
+          </TouchableOpacity>
+          {linkCopied && (
+            <View style={[styles.copiedToast, { top: insets.top + 56 }]}>
+              <Text style={styles.copiedToastText}>Link copied</Text>
+            </View>
+          )}
+
           {/* Pagination dots */}
           {images.length > 1 && (
             <View style={styles.dotsRow}>
@@ -280,6 +319,13 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
 
         {/* ── Product info ── */}
         <View style={styles.content}>
+          <View style={styles.badgeRow}>
+            <ConditionBadge condition={product.condition} size="md" />
+            {product.category ? (
+              <Text style={styles.categoryLabel}>{CATEGORY_LABEL[product.category]}</Text>
+            ) : null}
+          </View>
+
           {store && <Text style={styles.storeName}>{store.name}</Text>}
 
           <Text style={styles.productName}>{product.name}</Text>
@@ -358,6 +404,32 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
             </View>
           )}
 
+          {/* ── Vendor store card ── */}
+          {store && (
+            <TouchableOpacity
+              style={styles.storeCard}
+              onPress={() => navigation.navigate('StoreProfile', { storeId: product.store_id })}
+              activeOpacity={0.85}
+            >
+              <View style={styles.storeAvatar}>
+                <Text style={styles.storeAvatarText}>{store.name.charAt(0).toUpperCase()}</Text>
+              </View>
+              <View style={styles.storeCardBody}>
+                <Text style={styles.storeCardName} numberOfLines={1}>{store.name}</Text>
+                <Text style={styles.storeCardMeta} numberOfLines={1}>
+                  {store.rating != null ? `★ ${store.rating.toFixed(1)}` : '★ New'}
+                  {store.region ? `  ·  ${store.region}` : ''}
+                </Text>
+                {store.description ? (
+                  <Text style={styles.storeCardBio} numberOfLines={2}>{store.description}</Text>
+                ) : null}
+              </View>
+              <View style={styles.storeCardCta}>
+                <Text style={styles.storeCardCtaText}>Visit ›</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
           <View style={styles.bottomSpacer} />
         </View>
       </ScrollView>
@@ -386,7 +458,7 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
   },
   flex: { flex: 1 },
   centered: {
@@ -399,7 +471,7 @@ const styles = StyleSheet.create({
     height: CAROUSEL_HEIGHT,
   },
   imagePlaceholder: {
-    backgroundColor: '#E8E0D5',
+    backgroundColor: '#ECE6DC',
   },
   backBtn: {
     position: 'absolute',
@@ -417,6 +489,29 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#1C1612',
     lineHeight: 22,
+  },
+  shareBtn: {
+    position: 'absolute',
+    right: 16,
+  },
+  shareBtnText: {
+    fontSize: 18,
+    color: '#1C1612',
+    lineHeight: 22,
+    fontWeight: '700',
+  },
+  copiedToast: {
+    position: 'absolute',
+    right: 16,
+    backgroundColor: '#1C1612',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  copiedToastText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   dotsRow: {
     position: 'absolute',
@@ -437,12 +532,25 @@ const styles = StyleSheet.create({
   dotActive: {
     width: 18,
     borderRadius: 3,
-    backgroundColor: '#C8622A',
+    backgroundColor: '#D9552B',
   },
   // Content
   content: {
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  categoryLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#7A6A5A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
   },
   storeName: {
     fontSize: 11,
@@ -462,7 +570,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#C8622A',
+    color: '#D9552B',
     marginBottom: 16,
   },
   description: {
@@ -498,12 +606,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pillSelected: {
-    backgroundColor: '#C8622A',
-    borderColor: '#C8622A',
+    backgroundColor: '#D9552B',
+    borderColor: '#D9552B',
   },
   pillUnavailable: {
     opacity: 0.45,
-    backgroundColor: '#F0EBE3',
+    backgroundColor: '#F5EFE6',
     borderColor: '#E0D8CF',
   },
   pillText: {
@@ -512,7 +620,7 @@ const styles = StyleSheet.create({
     color: '#1C1612',
   },
   pillTextSelected: {
-    color: '#FAF7F2',
+    color: '#FFFFFF',
   },
   pillTextUnavailable: {
     textDecorationLine: 'line-through',
@@ -533,7 +641,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   swatchWrapperSelected: {
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
   },
   swatchWrapperUnavailable: {
     opacity: 0.3,
@@ -545,19 +653,69 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.1)',
   },
+  // Vendor store card
+  storeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F5EFE6',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 8,
+  },
+  storeAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1C1612',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storeAvatarText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  storeCardBody: {
+    flex: 1,
+    gap: 2,
+  },
+  storeCardName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1612',
+  },
+  storeCardMeta: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#D9552B',
+  },
+  storeCardBio: {
+    fontSize: 12,
+    color: '#7A6A5A',
+    lineHeight: 17,
+  },
+  storeCardCta: {
+    paddingLeft: 4,
+  },
+  storeCardCtaText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1C1612',
+  },
   bottomSpacer: { height: 16 },
   // Action bar
   actionBar: {
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 16,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E8E0D5',
+    borderTopColor: '#ECE6DC',
   },
   orderBtn: {
-    backgroundColor: '#C8622A',
-    borderRadius: 12,
+    backgroundColor: '#D9552B',
+    borderRadius: 28,
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
@@ -572,12 +730,12 @@ const styles = StyleSheet.create({
   orderBtnText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
     letterSpacing: 0.3,
   },
   errorText: {
     fontSize: 14,
-    color: '#C8622A',
+    color: '#D9552B',
     textAlign: 'center',
     paddingHorizontal: 32,
   },

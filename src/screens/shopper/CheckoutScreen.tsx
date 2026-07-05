@@ -12,12 +12,14 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { LEBANON_REGIONS, LebanonRegion } from '../../lib/catalog'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useCartStore } from '../../store/useCartStore'
 import { Database } from '../../types/supabase'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
 import { notifyNewOrder } from '../../lib/whatsapp'
+import { pushNotifyNewOrder } from '../../lib/push'
 
 type Props = NativeStackScreenProps<ShopperStackParamList, 'Checkout'>
 type PaymentMethod = Database['public']['Enums']['payment_method']
@@ -59,6 +61,7 @@ export default function CheckoutScreen({ navigation }: Props) {
 
   const [street,        setStreet]        = useState('')
   const [landmark,      setLandmark]      = useState('')
+  const [region,        setRegion]        = useState<LebanonRegion | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
   const [placing,       setPlacing]       = useState(false)
   const orderPlacedRef = useRef(false)
@@ -76,6 +79,7 @@ export default function CheckoutScreen({ navigation }: Props) {
 
   const canPlace =
     street.trim().length > 0 &&
+    region !== null &&
     paymentMethod !== null &&
     items.length > 0 &&
     !placing
@@ -117,6 +121,7 @@ export default function CheckoutScreen({ navigation }: Props) {
           delivery_fee_usd: 0,
           total_usd:        subtotal,
           delivery_address: buildAddress(),
+          delivery_region:  region,
           whatsapp_sent:    false,
         })
         .select('id, order_number')
@@ -140,6 +145,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       if (itemsError) throw itemsError
 
       notifyNewOrder(order.id)
+      pushNotifyNewOrder(order.id)
       orderPlacedRef.current = true
       clearCart()
       navigation.navigate('OrderConfirmation', {
@@ -162,7 +168,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       )
       setPlacing(false)
     }
-  }, [canPlace, user, items, paymentMethod, subtotal, buildAddress, clearCart, navigation])
+  }, [canPlace, user, items, paymentMethod, region, subtotal, buildAddress, clearCart, navigation])
 
   // ---- Render ----
 
@@ -228,6 +234,25 @@ export default function CheckoutScreen({ navigation }: Props) {
           {/* ── Delivery Details ── */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Delivery Details</Text>
+
+            <Text style={styles.inputLabel}>Region</Text>
+            <View style={styles.regionRow}>
+              {LEBANON_REGIONS.map(r => {
+                const selected = region === r
+                return (
+                  <TouchableOpacity
+                    key={r}
+                    style={[styles.regionChip, selected && styles.regionChipSelected]}
+                    onPress={() => setRegion(r)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.regionChipText, selected && styles.regionChipTextSelected]}>
+                      {r}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
 
             <Text style={styles.inputLabel}>Street / Area</Text>
             <TextInput
@@ -334,7 +359,7 @@ export default function CheckoutScreen({ navigation }: Props) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FAF7F2' },
+  safe: { flex: 1, backgroundColor: '#FFFFFF' },
   flex: { flex: 1 },
   // Header
   header: {
@@ -343,7 +368,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D5',
+    borderBottomColor: '#ECE6DC',
   },
   backBtn:     { width: 40, height: 44, justifyContent: 'center' },
   backIcon:    { fontSize: 22, color: '#1C1612', lineHeight: 26 },
@@ -381,7 +406,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#F0EBE3',
+    backgroundColor: '#F5EFE6',
     marginVertical: 2,
   },
   // Order summary
@@ -418,11 +443,38 @@ const styles = StyleSheet.create({
   },
   inputLabelAccent: {
     fontWeight: '400',
-    color: '#C8622A',
+    color: '#D9552B',
     fontStyle: 'italic',
   },
+  regionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  regionChip: {
+    height: 40,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#D9CFC4',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  regionChipSelected: {
+    backgroundColor: '#D9552B',
+    borderColor: '#D9552B',
+  },
+  regionChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7A6A5A',
+  },
+  regionChipTextSelected: {
+    color: '#FFFFFF',
+  },
   input: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#D9CFC4',
     borderRadius: 10,
@@ -450,12 +502,12 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#E8E0D5',
-    backgroundColor: '#FAF7F2',
+    borderColor: '#ECE6DC',
+    backgroundColor: '#FFFFFF',
     minHeight: 60,
   },
   paymentOptionSelected: {
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
     backgroundColor: '#FFF8F4',
   },
   paymentBody:  { flex: 1 },
@@ -464,7 +516,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1612',
   },
-  paymentLabelSelected: { color: '#C8622A' },
+  paymentLabelSelected: { color: '#D9552B' },
   paymentDesc: {
     fontSize: 11,
     color: '#7A6A5A',
@@ -481,21 +533,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  radioOuterSelected: { borderColor: '#C8622A' },
+  radioOuterSelected: { borderColor: '#D9552B' },
   radioInner: {
     width: 11,
     height: 11,
     borderRadius: 6,
-    backgroundColor: '#C8622A',
+    backgroundColor: '#D9552B',
   },
   // Bottom bar
   bottomBar: {
     paddingHorizontal: 20,
     paddingTop: 14,
     paddingBottom: 16,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E8E0D5',
+    borderTopColor: '#ECE6DC',
     gap: 14,
   },
   totalRow: {
@@ -506,8 +558,8 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 14, fontWeight: '500', color: '#7A6A5A' },
   totalValue: { fontSize: 22, fontWeight: '700', color: '#1C1612' },
   placeBtn: {
-    backgroundColor: '#C8622A',
-    borderRadius: 12,
+    backgroundColor: '#D9552B',
+    borderRadius: 28,
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
@@ -516,7 +568,7 @@ const styles = StyleSheet.create({
   placeBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
     letterSpacing: 0.3,
   },
 })

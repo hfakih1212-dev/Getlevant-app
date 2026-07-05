@@ -201,7 +201,7 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FAF7F2' },
+  safe: { flex: 1, backgroundColor: '#FFFFFF' },
   flex: { flex: 1 },
   // Header
   header: {
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D5',
+    borderBottomColor: '#ECE6DC',
   },
   backBtn:      { width: 40, height: 44, justifyContent: 'center' },
   backIcon:     { fontSize: 22, color: '#1C1612', lineHeight: 26 },
@@ -269,8 +269,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pillSelected: {
-    backgroundColor: '#C8622A',
-    borderColor: '#C8622A',
+    backgroundColor: '#D9552B',
+    borderColor: '#D9552B',
   },
   pillText: {
     fontSize: 13,
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
     color: '#1C1612',
   },
   pillTextSelected: {
-    color: '#FAF7F2',
+    color: '#FFFFFF',
   },
   // Inputs
   inputLabel: {
@@ -287,14 +287,14 @@ const styles = StyleSheet.create({
     color: '#1C1612',
   },
   required: {
-    color: '#C8622A',
+    color: '#D9552B',
   },
   optional: {
     fontWeight: '400',
     color: '#7A6A5A',
   },
   input: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#D9CFC4',
     borderRadius: 10,
@@ -312,13 +312,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 16,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E8E0D5',
+    borderTopColor: '#ECE6DC',
   },
   submitBtn: {
-    backgroundColor: '#C8622A',
-    borderRadius: 12,
+    backgroundColor: '#D9552B',
+    borderRadius: 28,
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   submitBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
     letterSpacing: 0.3,
   },
 })

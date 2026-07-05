@@ -21,9 +21,8 @@ async function fetchOrCreateProfile(): Promise<UserRow | null> {
     .maybeSingle()
   if (existing) return existing
   // Row missing (auth user pre-dates the trigger) — create it via security-definer RPC
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: created } = await (supabase.rpc as any)('ensure_my_profile')
-  return created as UserRow | null
+  const { data: created } = await supabase.rpc('ensure_my_profile')
+  return created ?? null
 }
 
 export const useAuthStore = create<AuthState>((set) => ({

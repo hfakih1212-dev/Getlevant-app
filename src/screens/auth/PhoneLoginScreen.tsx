@@ -11,7 +11,11 @@ import {
   ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../../lib/supabase'
+import type { ShopperStackParamList } from '../../navigation/RootNavigator'
+
+type Props = NativeStackScreenProps<ShopperStackParamList, 'Login'>
 
 function maskEmail(email: string): string {
   const [local, domain] = email.split('@')
@@ -19,7 +23,7 @@ function maskEmail(email: string): string {
   return `${local.slice(0, 2)}***@${domain}`
 }
 
-export default function PhoneLoginScreen() {
+export default function PhoneLoginScreen({ navigation }: Props) {
   const [email,      setEmail]      = useState('')
   const [otpCode,    setOtpCode]    = useState('')
   const [isCodeSent, setIsCodeSent] = useState(false)
@@ -27,6 +31,8 @@ export default function PhoneLoginScreen() {
   const [error,      setError]      = useState<string | null>(null)
   const [resending,  setResending]  = useState(false)
   const [resent,     setResent]     = useState(false)
+  // Only one input is visible per stage, so a single focus flag covers both
+  const [inputFocused, setInputFocused] = useState(false)
 
   const codeInputRef = useRef<TextInput>(null)
 
@@ -62,7 +68,10 @@ export default function PhoneLoginScreen() {
         type: 'email',
       })
       if (verifyError) throw verifyError
-      // On success onAuthStateChange fires in useAuthStore — navigator switches automatically
+      // onAuthStateChange in useAuthStore picks up the session; pop back to
+      // wherever the guest came from (vendors get re-rooted automatically)
+      if (navigation.canGoBack()) navigation.goBack()
+      else navigation.replace('MarketplaceFeed')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid code. Try again.')
       setOtpCode('')
@@ -108,6 +117,15 @@ export default function PhoneLoginScreen() {
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
         >
+          {navigation.canGoBack() && (
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => navigation.goBack()}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.backIcon}>←</Text>
+            </TouchableOpacity>
+          )}
           <View style={styles.header}>
             <Text style={styles.title}>
               {isCodeSent ? 'Enter your code' : 'Welcome to Souk'}
@@ -125,11 +143,13 @@ export default function PhoneLoginScreen() {
           {/* Stage 1 — Email input */}
           {!isCodeSent && (
             <TextInput
-              style={styles.input}
+              style={[styles.input, inputFocused && styles.inputFocused]}
               value={email}
               onChangeText={(t) => { setError(null); setEmail(t) }}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
               placeholder="you@example.com"
-              placeholderTextColor="#A89880"
+              placeholderTextColor="#B0A090"
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -143,13 +163,15 @@ export default function PhoneLoginScreen() {
           {isCodeSent && (
             <TextInput
               ref={codeInputRef}
-              style={styles.codeInput}
+              style={[styles.codeInput, inputFocused && styles.inputFocused]}
               value={otpCode}
               onChangeText={(t) => {
                 setError(null)
                 setResent(false)
                 setOtpCode(t.replace(/\D/g, '').slice(0, 6))
               }}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
               keyboardType="number-pad"
               maxLength={6}
               returnKeyType="done"
@@ -179,7 +201,7 @@ export default function PhoneLoginScreen() {
               activeOpacity={0.8}
             >
               {loading
-                ? <ActivityIndicator color="#FAF7F2" />
+                ? <ActivityIndicator color="#FFFFFF" />
                 : <Text style={styles.buttonText}>Send Code</Text>
               }
             </TouchableOpacity>
@@ -191,7 +213,7 @@ export default function PhoneLoginScreen() {
               activeOpacity={0.8}
             >
               {loading
-                ? <ActivityIndicator color="#FAF7F2" />
+                ? <ActivityIndicator color="#FFFFFF" />
                 : <Text style={styles.buttonText}>Confirm Code</Text>
               }
             </TouchableOpacity>
@@ -229,14 +251,19 @@ export default function PhoneLoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe:      { flex: 1, backgroundColor: '#FAF7F2' },
+  safe:      { flex: 1, backgroundColor: '#FFFFFF' },
   flex:      { flex: 1 },
   container: {
     flexGrow: 1,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
     paddingHorizontal: 24,
     paddingTop: 64,
     paddingBottom: 40,
   },
+  backBtn:   { width: 44, height: 44, justifyContent: 'center', marginBottom: 8 },
+  backIcon:  { fontSize: 22, color: '#1C1612', lineHeight: 26 },
   header:    { marginBottom: 40 },
   title: {
     fontSize: 32,
@@ -278,6 +305,9 @@ const styles = StyleSheet.create({
     minHeight: 72,
     marginBottom: 16,
   },
+  inputFocused: {
+    borderColor: '#D9552B',
+  },
   errorBox: {
     backgroundColor: '#FDF0EC',
     borderRadius: 8,
@@ -286,7 +316,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   errorText: {
-    color: '#C8622A',
+    color: '#D9552B',
     fontSize: 14,
     lineHeight: 20,
   },
@@ -298,8 +328,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   button: {
-    backgroundColor: '#C8622A',
-    borderRadius: 12,
+    backgroundColor: '#D9552B',
+    borderRadius: 28,
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
@@ -308,7 +338,7 @@ const styles = StyleSheet.create({
   },
   buttonMuted: { opacity: 0.5 },
   buttonText: {
-    color: '#FAF7F2',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.3,

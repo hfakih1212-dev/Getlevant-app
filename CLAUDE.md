@@ -101,7 +101,8 @@ npx supabase secrets set KEY=value --project-ref fhsnjdwciwzpkzwvcbrl
 - **Supabase queries**: always destructure `{ data, error }` and handle both
 - **Comments**: only when the WHY is non-obvious. No docblocks, no task references
 - **Styles**: StyleSheet.create at bottom of file, no inline styles
-- **Colors**: use the design tokens — `#FAF7F2` (background), `#1C1612` (text), `#C8622A` (primary/orange), `#7A6A5A` (muted text), `#E8E0D5` (border)
+- **Colors**: use the design tokens — `#FFFFFF` (background), `#1C1612` (text), `#D9552B` (primary/terracotta), `#7A6A5A` (muted text), `#ECE6DC` (hairline border), `#D9CFC4` (input border), `#F5EFE6` (sand fill), `#F0E9DF` (image placeholder/skeleton)
+- **Buttons**: primary CTAs are terracotta pills — height 56, `borderRadius: 28`
 
 ## Things to Never Do
 - Never `git add -A` or `git add .` — stage files by name only
@@ -112,7 +113,18 @@ npx supabase secrets set KEY=value --project-ref fhsnjdwciwzpkzwvcbrl
 - Always include `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` in commits
 
 ## Pending / Known Issues
-- No vendor role-selection screen — all new signups are shoppers; vendors set via DB
 - WhatsApp notifications deployed but `WHATSAPP_API_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` secrets not set
 - Branch is ahead of `origin/main` — needs push
-- No product image upload UI yet (bucket exists: `product-images`)
+- Push notifications: pipeline is live (`push-notify` Edge Function + token registration in
+  ProfileScreen) but requires a fresh EAS dev build — `expo-notifications` added a native module
+- No referral redemption flow yet — codes exist on users but nothing consumes them at checkout
+
+## Recently shipped (2026-07-05)
+- Guest browsing: unauthenticated users get ShopperStack (feed/product/store/cart);
+  Login is a screen inside the stack, auth-only screens registered only when signed in
+- Deep links: `souk://product/:id`, `souk://store/:id` (+ web paths); share buttons on
+  product + store screens (`src/lib/share.ts`)
+- Reviews: `reviews` table (one per delivered order, RLS-gated), star prompt in MyOrders,
+  review list on StoreProfile, `stores.rating` maintained by trigger
+- Product photo editing in ProductManagementScreen edit mode (add/remove, storage cleanup)
+- Vendor self-onboarding via ProfileScreen ("Start Selling", inline confirm — no Alert.alert)

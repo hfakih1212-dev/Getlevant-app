@@ -49,7 +49,7 @@ export default function OrderConfirmationScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FAF7F2' },
+  safe: { flex: 1, backgroundColor: '#FFFFFF' },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -63,14 +63,14 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     backgroundColor: '#FFF3EC',
     borderWidth: 2,
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
   },
   iconText: {
     fontSize: 36,
-    color: '#C8622A',
+    color: '#D9552B',
     fontWeight: '700',
     lineHeight: 42,
   },
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   orderNumber: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#C8622A',
+    color: '#D9552B',
     letterSpacing: 1.2,
   },
   body: {
@@ -95,8 +95,8 @@ const styles = StyleSheet.create({
   },
   btn: {
     marginTop: 4,
-    backgroundColor: '#C8622A',
-    borderRadius: 12,
+    backgroundColor: '#D9552B',
+    borderRadius: 28,
     height: 52,
     paddingHorizontal: 40,
     justifyContent: 'center',
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   btnText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
     letterSpacing: 0.2,
   },
   ordersLink: {
@@ -116,6 +116,6 @@ const styles = StyleSheet.create({
   ordersLinkText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#C8622A',
+    color: '#D9552B',
   },
 })

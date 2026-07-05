@@ -136,7 +136,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
   if (loading) {
     return (
       <SafeAreaView style={[styles.safe, styles.centered]}>
-        <ActivityIndicator size="large" color="#C8622A" />
+        <ActivityIndicator size="large" color="#D9552B" />
       </SafeAreaView>
     )
   }
@@ -274,7 +274,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
             activeOpacity={0.85}
           >
             {saving ? (
-              <ActivityIndicator size="small" color="#FAF7F2" />
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Text style={styles.saveBtnText}>Save Changes</Text>
             )}
@@ -290,7 +290,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: '#FAF7F2' },
+  safe:    { flex: 1, backgroundColor: '#FFFFFF' },
   flex:    { flex: 1 },
   centered: { justifyContent: 'center', alignItems: 'center' },
 
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D5',
+    borderBottomColor: '#ECE6DC',
   },
   backBtn:     { width: 40, height: 44, justifyContent: 'center' },
   backIcon:    { fontSize: 22, color: '#1C1612', lineHeight: 26 },
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1612',
   },
-  required: { color: '#C8622A' },
+  required: { color: '#D9552B' },
   optional: { fontWeight: '400', color: '#7A6A5A' },
   fieldHint: {
     fontSize: 12,
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
 
   // Inputs
   input: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#D9CFC4',
     borderRadius: 10,
@@ -400,18 +400,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: '#D9CFC4',
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pillSelected:     { backgroundColor: '#C8622A', borderColor: '#C8622A' },
+  pillSelected:     { backgroundColor: '#D9552B', borderColor: '#D9552B' },
   pillText:         { fontSize: 13, fontWeight: '600', color: '#1C1612' },
-  pillTextSelected: { color: '#FAF7F2' },
+  pillTextSelected: { color: '#FFFFFF' },
 
   // Error
   errorText: {
     fontSize: 13,
-    color: '#C8622A',
+    color: '#D9552B',
     textAlign: 'center',
     paddingHorizontal: 8,
   },
@@ -423,14 +423,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#C8622A',
+    borderColor: '#D9552B',
     justifyContent: 'center',
     alignItems: 'center',
   },
   backLinkText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#C8622A',
+    color: '#D9552B',
   },
 
   // Sticky bottom
@@ -438,13 +438,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 16,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E8E0D5',
+    borderTopColor: '#ECE6DC',
   },
   saveBtn: {
-    backgroundColor: '#C8622A',
-    borderRadius: 12,
+    backgroundColor: '#D9552B',
+    borderRadius: 28,
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FAF7F2',
+    color: '#FFFFFF',
     letterSpacing: 0.3,
   },
 })

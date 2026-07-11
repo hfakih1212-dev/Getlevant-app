@@ -41,6 +41,10 @@ const en = {
   'feed.tryDifferent': 'Try a different search, category, or region.',
   'feed.newBoutiques': 'New boutiques are joining Souk every day.',
   'feed.clearFilters': 'Clear filters',
+  'feed.sponsored': 'Sponsored',
+  'feed.adLabel': 'Ad',
+  'feed.adPlaceholder': 'Advertisement space',
+  'feed.adSubtext': 'Ad partner banner mounts here',
 
   // Product
   'product.addToBag': 'Add to Bag',
@@ -132,6 +136,10 @@ const ar: Partial<Record<TranslationKey, string>> = {
   'feed.tryDifferent': 'جرّب بحثًا أو فئة أو منطقة مختلفة.',
   'feed.newBoutiques': 'بوتيكات جديدة تنضم إلى سوق كل يوم.',
   'feed.clearFilters': 'مسح الفلاتر',
+  'feed.sponsored': 'ممول',
+  'feed.adLabel': 'إعلان',
+  'feed.adPlaceholder': 'مساحة إعلانية',
+  'feed.adSubtext': 'شعار الشريك الإعلاني يظهر هنا',
 
   'product.addToBag': 'أضِف إلى الحقيبة',
   'product.addedToBag': '✓ أُضيف إلى الحقيبة',
@@ -216,6 +224,10 @@ const fr: Partial<Record<TranslationKey, string>> = {
   'feed.tryDifferent': 'Essayez une autre recherche, catégorie ou région.',
   'feed.newBoutiques': 'De nouvelles boutiques rejoignent Souk chaque jour.',
   'feed.clearFilters': 'Effacer les filtres',
+  'feed.sponsored': 'Sponsorisé',
+  'feed.adLabel': 'Pub',
+  'feed.adPlaceholder': 'Espace publicitaire',
+  'feed.adSubtext': "La bannière du partenaire publicitaire s'affiche ici",
 
   'product.addToBag': 'Ajouter au panier',
   'product.addedToBag': 'Ajouté au panier ✓',

@@ -38,13 +38,22 @@ type Props = NativeStackScreenProps<VendorStackParamList, 'ProductManagement'>
 const fetchStoreProducts = (storeId: string) =>
   supabase
     .from('products')
-    .select('id, name, price_usd, status, condition, product_variants ( stock ), product_images ( url, position )')
+    .select('id, name, price_usd, status, condition, is_promoted, promotion_expires_at, product_variants ( stock ), product_images ( url, position )')
     .eq('store_id', storeId)
     .order('created_at', { ascending: false })
 
 type StoreProduct = NonNullable<
   Awaited<ReturnType<typeof fetchStoreProducts>>['data']
 >[0]
+
+// is_promoted can outlive its paid window — same rule the shopper feed uses.
+// Read-only here: activating a promotion is a service-role-only write (see
+// the products_guard_promotion trigger) until a payment flow is built.
+function isEffectivelyPromoted(p: { is_promoted: boolean; promotion_expires_at: string | null }): boolean {
+  if (!p.is_promoted) return false
+  if (!p.promotion_expires_at) return true
+  return new Date(p.promotion_expires_at).getTime() > Date.now()
+}
 
 const MAX_PHOTOS = 4
 
@@ -146,10 +155,17 @@ const ProductCard = React.memo(function ProductCard({
         <View style={styles.productCardBody}>
           <View style={styles.productCardHeader}>
             <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
-            <View style={[styles.statusBadge, isActive ? styles.badgeActive : styles.badgeInactive]}>
-              <Text style={[styles.statusBadgeText, isActive ? styles.badgeActiveText : styles.badgeInactiveText]}>
-                {isActive ? 'Active' : 'Inactive'}
-              </Text>
+            <View style={styles.badgeGroup}>
+              {isEffectivelyPromoted(product) && (
+                <View style={styles.promotedBadge}>
+                  <Text style={styles.promotedBadgeText}>Promoted</Text>
+                </View>
+              )}
+              <View style={[styles.statusBadge, isActive ? styles.badgeActive : styles.badgeInactive]}>
+                <Text style={[styles.statusBadgeText, isActive ? styles.badgeActiveText : styles.badgeInactiveText]}>
+                  {isActive ? 'Active' : 'Inactive'}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -1139,7 +1155,23 @@ const styles = StyleSheet.create({
   },
   stockIn:  { fontSize: 12, fontWeight: '600', color: '#166534' },
   stockOut: { fontSize: 12, fontWeight: '600', color: '#991B1B' },
-  // Status badge
+  // Status / promotion badges
+  badgeGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  promotedBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+    backgroundColor: '#D9552B',
+  },
+  promotedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 3,

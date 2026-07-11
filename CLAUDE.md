@@ -117,6 +117,22 @@ npx supabase secrets set KEY=value --project-ref fhsnjdwciwzpkzwvcbrl
 - Deploy: `npx expo export --platform web && npx eas-cli deploy --prod --non-interactive`
 - Share links (`src/lib/share.ts` WEB_BASE_URL) and deep-link prefixes point at this domain
 
+## Monetization
+- Free to enter; revenue from programmatic banner ads + paid vendor "Promoted" placements
+- `products.is_promoted` / `products.promotion_expires_at` drive feed priority sorting.
+  **Writable only by the service role** — a `products_guard_promotion` trigger silently
+  resets both columns on any write that doesn't carry a service-role JWT, so a vendor
+  can't grant themselves the paid placement through the app (they own the row under RLS,
+  so without this guard a normal update call would work). Direct SQL/dashboard writes
+  also pass through (no JWT role claim = guard is a no-op) — that's the admin activation
+  path until a payment/entitlement Edge Function exists to set these for real.
+- In-feed ad slots: `AD_INTERVAL` in `MarketplaceFeedScreen.tsx` inserts a full-width
+  `AdSlotCard` placeholder every N organic cards (currently 8). It's a reserved-space
+  placeholder only — no ad SDK is installed. Mounting a real network (AdMob via
+  `react-native-google-mobile-ads`, or another provider) needs an app ID + ad unit IDs
+  and a config-plugin decision; flag before adding, it's a native dependency requiring
+  a new build.
+
 ## Pending / Known Issues
 - WhatsApp notifications deployed but `WHATSAPP_API_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` secrets not set
 - Push notifications require a fresh dev build under the NEW app id `com.souklb.app`
@@ -125,6 +141,15 @@ npx supabase secrets set KEY=value --project-ref fhsnjdwciwzpkzwvcbrl
   `src/lib/i18n.ts`; vendor screens, profile bulk, payment-method labels, and a proper
   RTL layout pass (I18nManager) are follow-ups
 - Referral payoff mints vouchers on first *delivered* order (milestone 0 = referral reward)
+
+## Recently shipped (2026-07-10, ads & promotion)
+- `products.is_promoted` / `promotion_expires_at` + service-role-only guard trigger
+  (see Monetization above)
+- Feed: promoted-eligible products stable-sort to the top of every category/search
+  view; in-feed ad slot placeholders every 8 organic cards (row-chunked grid —
+  MarketplaceFeedScreen no longer uses FlatList's numColumns)
+- Terracotta "Sponsored" strip on promoted product cards; read-only "Promoted" chip
+  in the vendor's own inventory list (ProductManagementScreen)
 
 ## Recently shipped (2026-07-05, second batch)
 - Web app deployed to EAS Hosting; share links are real public URLs

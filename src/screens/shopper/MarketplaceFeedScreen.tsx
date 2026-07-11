@@ -42,6 +42,8 @@ const fetchFeed = () =>
       category,
       condition,
       created_at,
+      is_promoted,
+      promotion_expires_at,
       stores!inner ( id, name, region, rating, logo_url ),
       product_images ( url, position ),
       product_variants ( size, color, color_hex, stock )
@@ -49,6 +51,9 @@ const fetchFeed = () =>
     )
     .eq('status', 'active')
     .eq('stores.status', 'active')
+    // Promoted rows first at the source too; the client-side stable sort
+    // below is what actually enforces this once expiry is accounted for.
+    .order('is_promoted', { ascending: false })
     .order('created_at', { ascending: false })
 
 type FeedProduct = NonNullable<Awaited<ReturnType<typeof fetchFeed>>['data']>[0]
@@ -93,6 +98,43 @@ function resolveStore(stores: FeedProduct['stores']): FeedStore | null {
   return (Array.isArray(stores) ? stores[0] : stores) as FeedStore | null
 }
 
+// is_promoted can outlive its paid window — always gate on expiry too.
+// Setting these columns is service-role-only (see the products_guard_promotion
+// trigger); nothing in this screen writes them.
+function isEffectivelyPromoted(p: { is_promoted: boolean; promotion_expires_at: string | null }): boolean {
+  if (!p.is_promoted) return false
+  if (!p.promotion_expires_at) return true
+  return new Date(p.promotion_expires_at).getTime() > Date.now()
+}
+
+// ---------------------------------------------------------------------------
+// In-feed ad slots — one full-width placeholder inserted after every
+// AD_INTERVAL organic cards. Rows are chunked manually (rather than relying
+// on FlatList's numColumns) so a slot can span both grid columns cleanly.
+// ---------------------------------------------------------------------------
+
+const AD_INTERVAL = 8 // organic cards shown between each in-feed ad slot
+
+type FeedRow =
+  | { type: 'products'; key: string; items: FeedProduct[] }
+  | { type: 'ad'; key: string }
+
+function buildFeedRows(items: FeedProduct[]): FeedRow[] {
+  const rows: FeedRow[] = []
+  let sinceAd = 0
+  for (let i = 0; i < items.length; i += 2) {
+    const pair = items.slice(i, i + 2)
+    rows.push({ type: 'products', key: `row-${i}`, items: pair })
+    sinceAd += pair.length
+    // Skip a trailing ad slot right at the tail of the list
+    if (sinceAd >= AD_INTERVAL && i + 2 < items.length) {
+      rows.push({ type: 'ad', key: `ad-${i}` })
+      sinceAd = 0
+    }
+  }
+  return rows
+}
+
 // ---------------------------------------------------------------------------
 // ProductCard
 // ---------------------------------------------------------------------------
@@ -102,13 +144,15 @@ type CardProps = {
   cardWidth: number
   imageHeight: number
   favorite: boolean
+  promoted: boolean
   onPress: (item: FeedProduct) => void
   onToggleFav: (productId: string) => void
 }
 
 const ProductCard = React.memo(function ProductCard({
-  item, cardWidth, imageHeight, favorite, onPress, onToggleFav,
+  item, cardWidth, imageHeight, favorite, promoted, onPress, onToggleFav,
 }: CardProps) {
+  const t = useT()
   const images = Array.isArray(item.product_images) ? item.product_images : []
   const coverUrl = [...images].sort((a, b) => a.position - b.position)[0]?.url ?? null
 
@@ -145,6 +189,13 @@ const ProductCard = React.memo(function ProductCard({
             {favorite ? '♥' : '♡'}
           </Text>
         </TouchableOpacity>
+        {/* Vendor-paid boost — visually distinct from the ConditionBadge so
+            shoppers can't mistake a paid placement for a catalog fact */}
+        {promoted && (
+          <View style={styles.sponsoredStrip}>
+            <Text style={styles.sponsoredStripText}>✦ {t('feed.sponsored')}</Text>
+          </View>
+        )}
       </View>
 
       {/* Text block */}
@@ -163,6 +214,29 @@ const ProductCard = React.memo(function ProductCard({
     </TouchableOpacity>
   )
 })
+
+// ---------------------------------------------------------------------------
+// AdSlotCard — full-width programmatic ad placeholder
+// Integration point: mount <BannerAd .../> from react-native-google-mobile-ads
+// (or expo-ads-admob) here once an AdMob app ID / ad unit ID is available —
+// neither is configured yet, so this renders a clean reserved-space
+// placeholder instead of a live ad network call.
+// ---------------------------------------------------------------------------
+
+const AD_SLOT_HEIGHT = 100 // ~ standard mobile banner aspect
+
+function AdSlotCard({ width }: { width: number }) {
+  const t = useT()
+  return (
+    <View style={[styles.adCard, { width, height: AD_SLOT_HEIGHT }]}>
+      <View style={styles.adTag}>
+        <Text style={styles.adTagText}>{t('feed.adLabel')}</Text>
+      </View>
+      <Text style={styles.adPlaceholderText}>{t('feed.adPlaceholder')}</Text>
+      <Text style={styles.adPlaceholderSub}>{t('feed.adSubtext')}</Text>
+    </View>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // RailCard — compact product card for horizontal editorial rails
@@ -235,6 +309,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
   const gridWidth   = Math.min(windowWidth, MAX_CONTENT_WIDTH)
   const cardWidth   = (gridWidth - H_PAD * 2 - COL_GAP) / 2
   const imageHeight = cardWidth * IMAGE_RATIO
+  const rowWidth    = cardWidth * 2 + COL_GAP // exact width of a 2-up row — what the ad slot spans
 
   const [products,       setProducts]       = useState<FeedProduct[]>([])
   const [loading,        setLoading]        = useState(true)
@@ -297,8 +372,17 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
       result = [...result].sort((a, b) => Number(b.price_usd) - Number(a.price_usd))
     }
 
+    // Promoted items always float to the top of the (already filtered and
+    // sorted) list. Array.sort is stable, so this only reorders across the
+    // promoted/non-promoted boundary — everything else keeps its position.
+    result = [...result].sort(
+      (a, b) => Number(isEffectivelyPromoted(b)) - Number(isEffectivelyPromoted(a)),
+    )
+
     return result
   }, [products, searchText, selectedRegion, selectedCategory, sortBy])
+
+  const feedRows = useMemo(() => buildFeedRows(filteredProducts), [filteredProducts])
 
   // ---- Handlers ----
 
@@ -359,21 +443,36 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
     setSortBy('newest')
   }, [])
 
-  const renderItem: ListRenderItem<FeedProduct> = useCallback(
-    ({ item }) => (
-      <ProductCard
-        item={item}
-        cardWidth={cardWidth}
-        imageHeight={imageHeight}
-        favorite={favIds.has(item.id)}
-        onPress={handlePress}
-        onToggleFav={handleToggleFav}
-      />
-    ),
-    [handlePress, handleToggleFav, cardWidth, imageHeight, favIds],
+  const renderRow: ListRenderItem<FeedRow> = useCallback(
+    ({ item: row }) => {
+      if (row.type === 'ad') {
+        return (
+          <View style={styles.adRow}>
+            <AdSlotCard width={rowWidth} />
+          </View>
+        )
+      }
+      return (
+        <View style={styles.productRow}>
+          {row.items.map(p => (
+            <ProductCard
+              key={p.id}
+              item={p}
+              cardWidth={cardWidth}
+              imageHeight={imageHeight}
+              favorite={favIds.has(p.id)}
+              promoted={isEffectivelyPromoted(p)}
+              onPress={handlePress}
+              onToggleFav={handleToggleFav}
+            />
+          ))}
+        </View>
+      )
+    },
+    [handlePress, handleToggleFav, cardWidth, imageHeight, rowWidth, favIds],
   )
 
-  const keyExtractor = useCallback((item: FeedProduct) => item.id, [])
+  const rowKeyExtractor = useCallback((row: FeedRow) => row.key, [])
 
   const isFiltering =
     searchText.trim().length > 0 ||
@@ -555,12 +654,10 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
-          data={filteredProducts}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          numColumns={2}
+          data={feedRows}
+          keyExtractor={rowKeyExtractor}
+          renderItem={renderRow}
           contentContainerStyle={styles.listContent}
-          columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             !isFiltering && products.length > 0 ? (
@@ -885,8 +982,12 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
     flexGrow: 1,
   },
-  columnWrapper: {
+  productRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  adRow: {
     marginBottom: 18,
   },
 
@@ -930,6 +1031,25 @@ const styles = StyleSheet.create({
     color: '#7A6A5A',
     lineHeight: 19,
   },
+  // Vendor-paid "Sponsored" strip — sits along the bottom edge of the image
+  // so it never collides with the condition badge or heart button.
+  sponsoredStrip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 22,
+    backgroundColor: 'rgba(217,85,43,0.94)', // terracotta, slightly translucent
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sponsoredStripText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
   cardInfo: {
     paddingHorizontal: 2,
     paddingTop: 8,
@@ -965,6 +1085,45 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#1C1612',
     marginTop: 2,
+  },
+
+  // ── In-feed ad slot (programmatic placeholder) ──
+  adCard: {
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#D9CFC4',
+    borderStyle: 'dashed',
+    backgroundColor: '#F5EFE6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
+  },
+  adTag: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    height: 18,
+    paddingHorizontal: 8,
+    borderRadius: 9,
+    backgroundColor: '#D9CFC4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adTagText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#5A4A3A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  adPlaceholderText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7A6A5A',
+  },
+  adPlaceholderSub: {
+    fontSize: 11,
+    color: '#B0A090',
   },
 
   // ── Editorial rails ──

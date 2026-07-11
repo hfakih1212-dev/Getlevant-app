@@ -279,8 +279,10 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          is_promoted: boolean
           name: string
           price_usd: number
+          promotion_expires_at: string | null
           status: string
           store_id: string
         }
@@ -290,8 +292,10 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          is_promoted?: boolean
           name: string
           price_usd: number
+          promotion_expires_at?: string | null
           status?: string
           store_id: string
         }
@@ -301,8 +305,10 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          is_promoted?: boolean
           name?: string
           price_usd?: number
+          promotion_expires_at?: string | null
           status?: string
           store_id?: string
         }

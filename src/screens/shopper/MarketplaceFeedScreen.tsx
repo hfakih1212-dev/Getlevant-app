@@ -559,89 +559,6 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
         </View>
       </View>
 
-      {/* ── Category strip ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryStrip}
-        style={styles.categoryBar}
-      >
-        <TouchableOpacity
-          style={[styles.categoryPill, selectedCategory === null && styles.categoryPillActive]}
-          onPress={() => setSelectedCategory(null)}
-          activeOpacity={0.75}
-        >
-          <Text
-            style={[
-              styles.categoryPillText,
-              selectedCategory === null && styles.categoryPillActiveText,
-            ]}
-          >
-            {t('feed.all')}
-          </Text>
-        </TouchableOpacity>
-        {CATEGORY_OPTIONS.map(opt => {
-          const active = selectedCategory === opt.value
-          return (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.categoryPill, active && styles.categoryPillActive]}
-              onPress={() => handleCategoryPress(opt.value)}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.categoryPillText, active && styles.categoryPillActiveText]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          )
-        })}
-      </ScrollView>
-
-      {/* ── Sort + Region strip ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterStrip}
-        style={styles.filterBar}
-      >
-        {/* Sort pills */}
-        {SORT_OPTIONS.map(opt => {
-          const active = sortBy === opt.value
-          return (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.pill, active && styles.pillSortActive]}
-              onPress={() => setSortBy(opt.value)}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.pillText, active && styles.pillSortActiveText]}>
-                {t(opt.labelKey)}
-              </Text>
-            </TouchableOpacity>
-          )
-        })}
-
-        {/* Divider */}
-        <View style={styles.pillDivider} />
-
-        {/* Region pills */}
-        {LEBANON_REGIONS.map(region => {
-          const active = selectedRegion === region
-          return (
-            <TouchableOpacity
-              key={region}
-              style={[styles.pill, active && styles.pillRegionActive]}
-              onPress={() => handleRegionPress(region)}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.pillText, active && styles.pillRegionActiveText]}>
-                {region}
-              </Text>
-            </TouchableOpacity>
-          )
-        })}
-      </ScrollView>
-
       {/* ── Body: skeleton grid / error / product grid ── */}
       {loading ? (
         <FeedSkeleton cardWidth={cardWidth} imageHeight={imageHeight} />
@@ -660,7 +577,95 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            !isFiltering && products.length > 0 ? (
+            <View>
+              {/* Category + Sort/Region pills — always rendered (even while a
+                  filter is active) and now part of the list's own scroll
+                  content, not a fixed sibling, so they can never collide with
+                  it and simply scroll away as the user browses. */}
+              <View style={styles.filtersWrap}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoryStrip}
+                  style={styles.categoryBar}
+                >
+                  <TouchableOpacity
+                    style={[styles.categoryPill, selectedCategory === null && styles.categoryPillActive]}
+                    onPress={() => setSelectedCategory(null)}
+                    activeOpacity={0.75}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryPillText,
+                        selectedCategory === null && styles.categoryPillActiveText,
+                      ]}
+                    >
+                      {t('feed.all')}
+                    </Text>
+                  </TouchableOpacity>
+                  {CATEGORY_OPTIONS.map(opt => {
+                    const active = selectedCategory === opt.value
+                    return (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[styles.categoryPill, active && styles.categoryPillActive]}
+                        onPress={() => handleCategoryPress(opt.value)}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[styles.categoryPillText, active && styles.categoryPillActiveText]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </ScrollView>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.filterStrip}
+                  style={styles.filterBar}
+                >
+                  {/* Sort pills */}
+                  {SORT_OPTIONS.map(opt => {
+                    const active = sortBy === opt.value
+                    return (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[styles.pill, active && styles.pillSortActive]}
+                        onPress={() => setSortBy(opt.value)}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[styles.pillText, active && styles.pillSortActiveText]}>
+                          {t(opt.labelKey)}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+
+                  {/* Divider */}
+                  <View style={styles.pillDivider} />
+
+                  {/* Region pills */}
+                  {LEBANON_REGIONS.map(region => {
+                    const active = selectedRegion === region
+                    return (
+                      <TouchableOpacity
+                        key={region}
+                        style={[styles.pill, active && styles.pillRegionActive]}
+                        onPress={() => handleRegionPress(region)}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[styles.pillText, active && styles.pillRegionActiveText]}>
+                          {region}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </ScrollView>
+              </View>
+
+              {!isFiltering && products.length > 0 && (
               <View style={styles.railsWrap}>
                 {/* Featured boutique */}
                 {featuredStore && (
@@ -724,7 +729,8 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
 
                 <Text style={styles.railTitle}>{t('feed.allProducts')}</Text>
               </View>
-            ) : null
+              )}
+            </View>
           }
           refreshControl={
             <RefreshControl
@@ -893,9 +899,23 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
 
+  // ── Category + Sort/Region pill rows ──
+  // Single vertical container for both horizontal pill scrollers. Explicit
+  // `gap` gives clean, guaranteed separation between the two rows — no
+  // reliance on margins that could be squeezed out under flex-shrink.
+  filtersWrap: {
+    gap: 12,
+    marginBottom: 8,
+  },
+
   // ── Category strip ──
+  // flexShrink: 0 + an explicit height lock this row's height regardless of
+  // available space — without it a horizontal ScrollView's height depends
+  // entirely on its children, and can collapse toward 0 under flex-shrink,
+  // which is what caused the category/filter rows to overlap each other.
   categoryBar: {
-    flexGrow: 0,
+    flexShrink: 0,
+    height: 46,
   },
   categoryStrip: {
     paddingHorizontal: H_PAD,
@@ -927,10 +947,10 @@ const styles = StyleSheet.create({
 
   // ── Filter strip (sort + region combined) ──
   filterBar: {
-    flexGrow: 0,
+    flexShrink: 0,
+    height: 44,
     borderBottomWidth: 1,
     borderBottomColor: '#ECE6DC',
-    marginBottom: 2,
   },
   filterStrip: {
     paddingHorizontal: H_PAD,

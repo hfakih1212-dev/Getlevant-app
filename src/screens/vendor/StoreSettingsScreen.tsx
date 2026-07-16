@@ -14,6 +14,7 @@ import {
 import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { useT } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
 import type { VendorStackParamList } from '../../navigation/RootNavigator'
@@ -53,6 +54,7 @@ function normalizePhone(raw: string): string {
 
 export default function StoreSettingsScreen({ navigation }: Props) {
   const user = useAuthStore(s => s.user)
+  const t = useT()
 
   const [storeId,     setStoreId]     = useState<string | null>(null)
   const [name,        setName]        = useState('')
@@ -145,7 +147,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
 
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
-      setLogoError('Allow photo library access in Settings to upload a logo.')
+      setLogoError(t('storeSettings.logoPermission'))
       return
     }
 
@@ -182,11 +184,11 @@ export default function StoreSettingsScreen({ navigation }: Props) {
 
       setLogoUrl(publicUrl)
     } catch (err) {
-      setLogoError(err instanceof Error ? err.message : 'Upload failed. Try again.')
+      setLogoError(err instanceof Error ? err.message : t('storeSettings.uploadFailed'))
     } finally {
       setLogoUploading(false)
     }
-  }, [storeId, logoUploading])
+  }, [storeId, logoUploading, t])
 
   // ---- Render ----
 
@@ -201,9 +203,9 @@ export default function StoreSettingsScreen({ navigation }: Props) {
   if (!storeId) {
     return (
       <SafeAreaView style={[styles.safe, styles.centered]}>
-        <Text style={styles.errorText}>No store found for your account.</Text>
+        <Text style={styles.errorText}>{t('storeSettings.noStore')}</Text>
         <TouchableOpacity style={styles.backLink} onPress={() => navigation.goBack()}>
-          <Text style={styles.backLinkText}>Go back</Text>
+          <Text style={styles.backLinkText}>{t('common.goBack')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     )
@@ -224,7 +226,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
           >
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Store Settings</Text>
+          <Text style={styles.headerTitle}>{t('storeSettings.title')}</Text>
           <View style={styles.headerRight} />
         </View>
 
@@ -235,7 +237,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Logo ── */}
-          <Text style={styles.sectionLabel}>STORE LOGO</Text>
+          <Text style={styles.sectionLabel}>{t('storeSettings.logo')}</Text>
           <View style={styles.card}>
             <View style={styles.logoRow}>
               {logoUrl ? (
@@ -248,9 +250,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
                 </View>
               )}
               <View style={styles.logoBody}>
-                <Text style={styles.fieldHint}>
-                  Shown on your storefront and product pages. Square images look best.
-                </Text>
+                <Text style={styles.fieldHint}>{t('storeSettings.logoHint')}</Text>
                 <TouchableOpacity
                   style={[styles.logoBtn, logoUploading && styles.logoBtnDisabled]}
                   onPress={handlePickLogo}
@@ -261,7 +261,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
                     <ActivityIndicator size="small" color="#D9552B" />
                   ) : (
                     <Text style={styles.logoBtnText}>
-                      {logoUrl ? 'Change Logo' : 'Upload Logo'}
+                      {logoUrl ? t('storeSettings.changeLogo') : t('storeSettings.uploadLogo')}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -271,29 +271,29 @@ export default function StoreSettingsScreen({ navigation }: Props) {
           </View>
 
           {/* ── Store Details ── */}
-          <Text style={styles.sectionLabel}>STORE DETAILS</Text>
+          <Text style={styles.sectionLabel}>{t('storeSettings.details')}</Text>
           <View style={styles.card}>
             <Text style={styles.inputLabel}>
-              Store Name <Text style={styles.required}>*</Text>
+              {t('onboarding.storeName')} <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={styles.input}
               value={name}
               onChangeText={setName}
-              placeholder="e.g. Nour Handmade Jewelry"
+              placeholder={t('onboarding.storeNamePlaceholder')}
               placeholderTextColor="#B0A090"
               returnKeyType="next"
               autoCapitalize="words"
             />
 
             <Text style={[styles.inputLabel, { marginTop: 4 }]}>
-              Description <Text style={styles.optional}>(optional)</Text>
+              {t('onboarding.description')} <Text style={styles.optional}>{t('common.optional')}</Text>
             </Text>
             <TextInput
               style={[styles.input, styles.inputMultiline]}
               value={description}
               onChangeText={setDescription}
-              placeholder="Tell shoppers what makes your store special…"
+              placeholder={t('onboarding.descriptionPlaceholder')}
               placeholderTextColor="#B0A090"
               multiline
               numberOfLines={3}
@@ -302,36 +302,32 @@ export default function StoreSettingsScreen({ navigation }: Props) {
           </View>
 
           {/* ── Contact ── */}
-          <Text style={styles.sectionLabel}>WHATSAPP CONTACT</Text>
+          <Text style={styles.sectionLabel}>{t('storeSettings.whatsappContact')}</Text>
           <View style={styles.card}>
             <Text style={styles.inputLabel}>
-              WhatsApp Number <Text style={styles.optional}>(optional)</Text>
+              {t('onboarding.whatsappNumber')} <Text style={styles.optional}>{t('common.optional')}</Text>
             </Text>
-            <Text style={styles.fieldHint}>
-              Vendors with a WhatsApp number receive new-order notifications instantly.
-            </Text>
+            <Text style={styles.fieldHint}>{t('storeSettings.whatsappHint')}</Text>
             <TextInput
               style={[styles.input, { marginTop: 6 }]}
               value={whatsapp}
               onChangeText={setWhatsapp}
-              placeholder="+961 70 123 456 or 03 123 456"
+              placeholder="+961 70 123 456 / 03 123 456"
               placeholderTextColor="#B0A090"
               keyboardType="phone-pad"
               returnKeyType="done"
             />
             {whatsapp.trim().length > 0 && (
               <Text style={styles.phonePreview}>
-                Saves as: <Text style={styles.phonePreviewValue}>{normalizedPhone}</Text>
+                {t('storeSettings.savesAs')} <Text style={styles.phonePreviewValue}>{normalizedPhone}</Text>
               </Text>
             )}
           </View>
 
           {/* ── Region ── */}
-          <Text style={styles.sectionLabel}>REGION</Text>
+          <Text style={styles.sectionLabel}>{t('storeSettings.region')}</Text>
           <View style={styles.card}>
-            <Text style={styles.fieldHint}>
-              Select your primary area, or leave blank if you deliver nationwide.
-            </Text>
+            <Text style={styles.fieldHint}>{t('onboarding.regionHint')}</Text>
             <View style={styles.pillGrid}>
               {LEBANON_REGIONS.map(r => {
                 const selected = region === r
@@ -343,7 +339,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
                     activeOpacity={0.75}
                   >
                     <Text style={[styles.pillText, selected && styles.pillTextSelected]}>
-                      {r}
+                      {t(`region.${r}`)}
                     </Text>
                   </TouchableOpacity>
                 )
@@ -369,7 +365,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
             {saving ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={styles.saveBtnText}>{saved ? 'Saved ✓' : 'Save Changes'}</Text>
+              <Text style={styles.saveBtnText}>{saved ? t('storeSettings.saved') : t('storeSettings.saveChanges')}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -418,6 +414,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#7A6A5A',
+    textTransform: 'uppercase',
     letterSpacing: 0.8,
     paddingHorizontal: 4,
     marginTop: 8,

@@ -20,11 +20,11 @@ import { useFocusEffect } from '@react-navigation/native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import {
   CATEGORY_OPTIONS,
-  CONDITION_LABEL,
   CONDITION_OPTIONS,
   ProductCategory,
   ProductCondition,
 } from '../../lib/catalog'
+import { useT } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
 import type { VendorStackParamList } from '../../navigation/RootNavigator'
@@ -133,6 +133,7 @@ const ProductCard = React.memo(function ProductCard({
   product: StoreProduct
   onEdit: (productId: string) => void
 }) {
+  const t = useT()
   const totalStock   = product.product_variants.reduce((sum, v) => sum + (v.stock ?? 0), 0)
   const variantCount = product.product_variants.length
   const isActive     = product.status === 'active'
@@ -158,12 +159,12 @@ const ProductCard = React.memo(function ProductCard({
             <View style={styles.badgeGroup}>
               {isEffectivelyPromoted(product) && (
                 <View style={styles.promotedBadge}>
-                  <Text style={styles.promotedBadgeText}>Promoted</Text>
+                  <Text style={styles.promotedBadgeText}>{t('inventory.promotedBadge')}</Text>
                 </View>
               )}
               <View style={[styles.statusBadge, isActive ? styles.badgeActive : styles.badgeInactive]}>
                 <Text style={[styles.statusBadgeText, isActive ? styles.badgeActiveText : styles.badgeInactiveText]}>
-                  {isActive ? 'Active' : 'Inactive'}
+                  {isActive ? t('inventory.activeBadge') : t('inventory.inactiveBadge')}
                 </Text>
               </View>
             </View>
@@ -175,10 +176,10 @@ const ProductCard = React.memo(function ProductCard({
 
           <View style={styles.productMeta}>
             <Text style={styles.variantCount}>
-              {CONDITION_LABEL[product.condition]} · {variantCount} variant{variantCount !== 1 ? 's' : ''}
+              {t(`condition.${product.condition}`)} · {variantCount === 1 ? t('inventory.variantOne') : t('inventory.variantMany', { n: variantCount })}
             </Text>
             <Text style={totalStock > 0 ? styles.stockIn : styles.stockOut}>
-              {totalStock > 0 ? `${totalStock} in stock` : 'Out of stock'}
+              {totalStock > 0 ? t('inventory.inStock', { n: totalStock }) : t('inventory.outOfStock')}
             </Text>
           </View>
         </View>
@@ -224,10 +225,11 @@ type VariantCardProps = {
 }
 
 function VariantCard({ variant, index, canRemove, onUpdate, onRemove }: VariantCardProps) {
+  const t = useT()
   return (
     <View style={styles.variantCard}>
       <View style={styles.variantCardHeader}>
-        <Text style={styles.variantCardTitle}>Variant {index + 1}</Text>
+        <Text style={styles.variantCardTitle}>{t('inventory.variantN', { n: index + 1 })}</Text>
         {canRemove && (
           <TouchableOpacity
             style={styles.variantRemoveBtn}
@@ -242,23 +244,23 @@ function VariantCard({ variant, index, canRemove, onUpdate, onRemove }: VariantC
       {/* Row 1: Size | Color */}
       <View style={styles.variantRow}>
         <View style={styles.variantField}>
-          <Text style={styles.fieldLabel}>Size</Text>
+          <Text style={styles.fieldLabel}>{t('inventory.size')}</Text>
           <TextInput
             style={styles.fieldInput}
             value={variant.size}
             onChangeText={v => onUpdate(variant.key, 'size', v)}
-            placeholder="e.g. M"
+            placeholder={t('inventory.sizePlaceholder')}
             placeholderTextColor="#B0A090"
             returnKeyType="next"
           />
         </View>
         <View style={styles.variantField}>
-          <Text style={styles.fieldLabel}>Color Name</Text>
+          <Text style={styles.fieldLabel}>{t('inventory.colorName')}</Text>
           <TextInput
             style={styles.fieldInput}
             value={variant.color}
             onChangeText={v => onUpdate(variant.key, 'color', v)}
-            placeholder="e.g. Navy Blue"
+            placeholder={t('inventory.colorPlaceholder')}
             placeholderTextColor="#B0A090"
             returnKeyType="next"
           />
@@ -269,7 +271,7 @@ function VariantCard({ variant, index, canRemove, onUpdate, onRemove }: VariantC
       <View style={styles.variantRow}>
         <View style={styles.variantField}>
           <Text style={styles.fieldLabel}>
-            Hex <Text style={styles.optionalLabel}>(optional)</Text>
+            {t('inventory.hex')} <Text style={styles.optionalLabel}>{t('common.optional')}</Text>
           </Text>
           <TextInput
             style={styles.fieldInput}
@@ -282,7 +284,7 @@ function VariantCard({ variant, index, canRemove, onUpdate, onRemove }: VariantC
           />
         </View>
         <View style={styles.variantField}>
-          <Text style={styles.fieldLabel}>Stock</Text>
+          <Text style={styles.fieldLabel}>{t('inventory.stock')}</Text>
           <TextInput
             style={styles.fieldInput}
             value={variant.stock}
@@ -304,6 +306,7 @@ function VariantCard({ variant, index, canRemove, onUpdate, onRemove }: VariantC
 
 export default function ProductManagementScreen({ navigation, route }: Props) {
   const user = useAuthStore(s => s.user)
+  const t = useT()
 
   // Store
   const [storeId,   setStoreId]   = useState<string | null>(null)
@@ -334,6 +337,13 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
   const [originalVariantIds, setOriginalVariantIds] = useState<string[]>([])
   const [existingImages,     setExistingImages]     = useState<ExistingImage[]>([])
   const [removedImages,      setRemovedImages]      = useState<ExistingImage[]>([])
+
+  // Promoted placement (edit mode) — read-only promo state + request pipeline
+  const [promoInfo,       setPromoInfo]       = useState<{ isPromoted: boolean; expiresAt: string | null } | null>(null)
+  const [promoPending,    setPromoPending]    = useState(false)
+  const [promoDuration,   setPromoDuration]   = useState<7 | 30>(7)
+  const [promoSubmitting, setPromoSubmitting] = useState(false)
+  const [promoError,      setPromoError]      = useState<string | null>(null)
 
   // ---- Data loading ----
 
@@ -390,12 +400,17 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
     setOriginalVariantIds([])
     setExistingImages([])
     setRemovedImages([])
+    setPromoInfo(null)
+    setPromoPending(false)
+    setPromoDuration(7)
+    setPromoSubmitting(false)
+    setPromoError(null)
   }, [])
 
   const handlePickImage = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
-      setFormError('Allow access to your photo library in Settings to add product images.')
+      setFormError(t('inventory.errPhotoPermission'))
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -411,7 +426,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
       const toAdd = result.assets.slice(0, remaining).map(a => ({ uri: a.uri, key: mkImgKey() }))
       return [...prev, ...toAdd]
     })
-  }, [existingImages.length])
+  }, [existingImages.length, t])
 
   const removeImage = useCallback((key: string) => {
     setImagePicks(prev => prev.filter(p => p.key !== key))
@@ -440,7 +455,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
     const { data, error } = await supabase
       .from('products')
       .select(
-        'id, name, description, price_usd, category, condition, product_variants ( id, size, color, color_hex, stock ), product_images ( id, url, position )',
+        'id, name, description, price_usd, category, condition, is_promoted, promotion_expires_at, product_variants ( id, size, color, color_hex, stock ), product_images ( id, url, position )',
       )
       .eq('id', productId)
       .maybeSingle()
@@ -448,7 +463,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
     if (error || !data) {
       setFormLoading(false)
       setMode('list')
-      setListError(error?.message ?? 'Could not load that product.')
+      setListError(error?.message ?? t('inventory.loadFailed'))
       return
     }
 
@@ -470,8 +485,41 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
     setVariants(drafts.length > 0 ? drafts : [mkVariant()])
     setOriginalVariantIds(data.product_variants.map(v => v.id))
     setExistingImages([...data.product_images].sort((a, b) => a.position - b.position))
+    setPromoInfo({ isPromoted: data.is_promoted, expiresAt: data.promotion_expires_at })
+
+    const { data: pendingReq } = await supabase
+      .from('promotion_requests')
+      .select('id')
+      .eq('product_id', productId)
+      .eq('status', 'pending')
+      .maybeSingle()
+    setPromoPending(pendingReq !== null)
+
     setFormLoading(false)
-  }, [resetForm])
+  }, [resetForm, t])
+
+  const handleRequestPromotion = useCallback(async () => {
+    if (!editingId || !storeId || !user?.id) return
+    setPromoSubmitting(true)
+    setPromoError(null)
+
+    const { error } = await supabase
+      .from('promotion_requests')
+      .insert({
+        product_id:    editingId,
+        store_id:      storeId,
+        requested_by:  user.id,
+        duration_days: promoDuration,
+      })
+
+    // 23505 = a pending request already exists (double tap) — same outcome
+    if (error && error.code !== '23505') {
+      setPromoError(error.message)
+    } else {
+      setPromoPending(true)
+    }
+    setPromoSubmitting(false)
+  }, [editingId, storeId, user?.id, promoDuration])
 
   // Deep-link support: ProductManagement can be opened with { productId } to
   // jump straight into edit mode. Consume the param so re-focus doesn't loop.
@@ -513,20 +561,20 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
     setFormError(null)
 
     if (!name.trim()) {
-      setFormError('Product name is required.')
+      setFormError(t('inventory.errNameRequired'))
       return
     }
     const priceNum = parseFloat(price)
     if (isNaN(priceNum) || priceNum <= 0) {
-      setFormError('Enter a price greater than 0.')
+      setFormError(t('inventory.errPrice'))
       return
     }
     if (!category) {
-      setFormError('Pick a category so shoppers can find this item.')
+      setFormError(t('inventory.errCategory'))
       return
     }
     if (!storeId) {
-      setFormError('Could not find your store. Go back and reopen Inventory.')
+      setFormError(t('inventory.errStore'))
       return
     }
 
@@ -535,7 +583,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
       v => v.size.trim() || v.color.trim() || v.stock.trim(),
     )
     if (validVariants.length === 0) {
-      setFormError('Fill in at least one variant row — add a size, colour, or stock count.')
+      setFormError(t('inventory.errVariant'))
       return
     }
 
@@ -602,9 +650,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
           if (deleteErr) {
             // order_items.variant_id has no cascade — ordered variants can't go
             if (deleteErr.code === '23503') {
-              throw new Error(
-                'A removed variant already has orders against it, so it can\'t be deleted. Keep the row and set its stock to 0 instead.',
-              )
+              throw new Error(t('inventory.errVariantOrders'))
             }
             throw deleteErr
           }
@@ -689,11 +735,11 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
       setMode('list')
       resetForm()
     } catch (err: unknown) {
-      setFormError(err instanceof Error ? err.message : 'Something went wrong.')
+      setFormError(err instanceof Error ? err.message : t('inventory.somethingWrong'))
     } finally {
       setSaving(false)
     }
-  }, [name, price, description, category, condition, storeId, variants, imagePicks, mode, editingId, originalVariantIds, existingImages, removedImages, load, resetForm])
+  }, [name, price, description, category, condition, storeId, variants, imagePicks, mode, editingId, originalVariantIds, existingImages, removedImages, load, resetForm, t])
 
   // ---- FlatList helpers ----
 
@@ -724,7 +770,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
               <Text style={styles.headerBackIcon}>←</Text>
             </TouchableOpacity>
             <View style={styles.headerCenter}>
-              <Text style={styles.headerTitle}>{isEdit ? 'Edit Product' : 'New Product'}</Text>
+              <Text style={styles.headerTitle}>{isEdit ? t('inventory.editProduct') : t('inventory.newProduct')}</Text>
               <Text style={styles.headerSub}>{storeName}</Text>
             </View>
             <View style={styles.headerRight} />
@@ -743,28 +789,28 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
           >
             {/* ── Product details ── */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Product Details</Text>
+              <Text style={styles.sectionTitle}>{t('inventory.productDetails')}</Text>
 
               <Text style={styles.inputLabel}>
-                Name <Text style={styles.required}>*</Text>
+                {t('inventory.name')} <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
-                placeholder="e.g. Handwoven Leather Tote"
+                placeholder={t('inventory.namePlaceholder')}
                 placeholderTextColor="#B0A090"
                 returnKeyType="next"
               />
 
               <Text style={styles.inputLabel}>
-                Description <Text style={styles.optionalLabel}>(optional)</Text>
+                {t('inventory.description')} <Text style={styles.optionalLabel}>{t('common.optional')}</Text>
               </Text>
               <TextInput
                 style={[styles.input, styles.inputMultiline]}
                 value={description}
                 onChangeText={setDescription}
-                placeholder="Describe materials, craftsmanship, care instructions…"
+                placeholder={t('inventory.descriptionPlaceholder')}
                 placeholderTextColor="#B0A090"
                 multiline
                 numberOfLines={3}
@@ -772,7 +818,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
               />
 
               <Text style={styles.inputLabel}>
-                Price (USD) <Text style={styles.required}>*</Text>
+                {t('inventory.price')} <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
                 style={styles.input}
@@ -785,7 +831,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
               />
 
               <Text style={styles.inputLabel}>
-                Category <Text style={styles.required}>*</Text>
+                {t('inventory.category')} <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.categoryRow}>
                 {CATEGORY_OPTIONS.map(opt => {
@@ -800,7 +846,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
                       <Text
                         style={[styles.categoryChipText, active && styles.categoryChipActiveText]}
                       >
-                        {opt.label}
+                        {t(`catalog.${opt.value}`)}
                       </Text>
                     </TouchableOpacity>
                   )
@@ -808,7 +854,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
               </View>
 
               <Text style={styles.inputLabel}>
-                Condition <Text style={styles.required}>*</Text>
+                {t('inventory.condition')} <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.conditionToggle}>
                 {CONDITION_OPTIONS.map(opt => {
@@ -826,7 +872,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
                           active && styles.conditionSegmentActiveText,
                         ]}
                       >
-                        {opt.label}
+                        {t(`condition.${opt.value}`)}
                       </Text>
                     </TouchableOpacity>
                   )
@@ -837,8 +883,8 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
             {/* ── Photos — existing (edit mode) and newly picked share one grid ── */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                Photos{' '}
-                <Text style={styles.optionalLabel}>(up to {MAX_PHOTOS})</Text>
+                {t('inventory.photos')}{' '}
+                <Text style={styles.optionalLabel}>{t('inventory.photosUpTo', { n: MAX_PHOTOS })}</Text>
               </Text>
 
               <View style={styles.photoGrid}>
@@ -875,25 +921,24 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
                     activeOpacity={0.75}
                   >
                     <Text style={styles.photoAddIcon}>+</Text>
-                    <Text style={styles.photoAddLabel}>Add Photo</Text>
+                    <Text style={styles.photoAddLabel}>{t('inventory.addPhoto')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               {isEdit && removedImages.length > 0 && (
                 <Text style={styles.sectionHintPlain}>
-                  {removedImages.length} photo{removedImages.length !== 1 ? 's' : ''} will be
-                  removed when you save.
+                  {removedImages.length === 1
+                    ? t('inventory.photosRemovedOne')
+                    : t('inventory.photosRemovedMany', { n: removedImages.length })}
                 </Text>
               )}
             </View>
 
             {/* ── Variants ── */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Variants</Text>
-              <Text style={styles.sectionHint}>
-                Add a row for each size/colour combination you carry.
-              </Text>
+              <Text style={styles.sectionTitle}>{t('inventory.variants')}</Text>
+              <Text style={styles.sectionHint}>{t('inventory.variantsHint')}</Text>
 
               {variants.map((v, idx) => (
                 <VariantCard
@@ -911,9 +956,78 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
                 onPress={addVariantRow}
                 activeOpacity={0.8}
               >
-                <Text style={styles.addVariantBtnText}>+ Add Variant</Text>
+                <Text style={styles.addVariantBtnText}>{t('inventory.addVariant')}</Text>
               </TouchableOpacity>
             </View>
+
+            {/* ── Promoted placement (edit mode only — needs a saved product) ── */}
+            {isEdit && promoInfo && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>{t('inventory.promoTitle')}</Text>
+
+                {isEffectivelyPromoted({
+                  is_promoted: promoInfo.isPromoted,
+                  promotion_expires_at: promoInfo.expiresAt,
+                }) ? (
+                  <View style={styles.promoActiveBox}>
+                    <Text style={styles.promoActiveTitle}>{t('inventory.promoActive')}</Text>
+                    <Text style={styles.promoActiveBody}>
+                      {promoInfo.expiresAt
+                        ? t('inventory.promoActiveUntil', { date: new Date(promoInfo.expiresAt).toLocaleDateString() })
+                        : t('inventory.promoActiveNoExpiry')}
+                    </Text>
+                  </View>
+                ) : promoPending ? (
+                  <View style={styles.promoPendingBox}>
+                    <Text style={styles.promoPendingTitle}>{t('inventory.promoPendingTitle')}</Text>
+                    <Text style={styles.promoBoxBody}>{t('inventory.promoPendingBody')}</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={styles.sectionHint}>{t('inventory.promoHint')}</Text>
+
+                    <View style={styles.conditionToggle}>
+                      {([7, 30] as const).map(days => {
+                        const active = promoDuration === days
+                        return (
+                          <TouchableOpacity
+                            key={days}
+                            style={[styles.conditionSegment, active && styles.conditionSegmentActive]}
+                            onPress={() => setPromoDuration(days)}
+                            activeOpacity={0.8}
+                          >
+                            <Text
+                              style={[
+                                styles.conditionSegmentText,
+                                active && styles.conditionSegmentActiveText,
+                              ]}
+                            >
+                              {t('inventory.promoDays', { n: days })}
+                            </Text>
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.promoRequestBtn, promoSubmitting && styles.saveBtnDisabled]}
+                      onPress={handleRequestPromotion}
+                      disabled={promoSubmitting}
+                      activeOpacity={0.85}
+                    >
+                      {promoSubmitting
+                        ? <ActivityIndicator color="#D9552B" />
+                        : <Text style={styles.promoRequestBtnText}>{t('inventory.promoRequest')}</Text>
+                      }
+                    </TouchableOpacity>
+
+                    {promoError ? (
+                      <Text style={styles.formError}>{promoError}</Text>
+                    ) : null}
+                  </>
+                )}
+              </View>
+            )}
 
             {/* Inline validation error */}
             {formError ? (
@@ -932,7 +1046,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
             >
               {saving
                 ? <ActivityIndicator color="#FFFFFF" />
-                : <Text style={styles.saveBtnText}>{isEdit ? 'Update Product' : 'Save Product'}</Text>
+                : <Text style={styles.saveBtnText}>{isEdit ? t('inventory.updateProduct') : t('inventory.saveProduct')}</Text>
               }
             </TouchableOpacity>
           </View>
@@ -956,7 +1070,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
           <Text style={styles.headerBackIcon}>←</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Inventory</Text>
+          <Text style={styles.headerTitle}>{t('inventory.title')}</Text>
           <Text style={styles.headerSub}>{storeName}</Text>
         </View>
         <TouchableOpacity
@@ -964,7 +1078,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
           onPress={openAdd}
           activeOpacity={0.8}
         >
-          <Text style={styles.addProductBtnText}>+ Add</Text>
+          <Text style={styles.addProductBtnText}>{t('inventory.add')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -975,7 +1089,7 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
         <View style={styles.centered}>
           <Text style={styles.errorText}>{listError}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={load}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -987,10 +1101,8 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No products yet</Text>
-              <Text style={styles.emptyBody}>
-                Tap "+ Add" to list your first product in the marketplace.
-              </Text>
+              <Text style={styles.emptyTitle}>{t('inventory.empty')}</Text>
+              <Text style={styles.emptyBody}>{t('inventory.emptyBody')}</Text>
             </View>
           }
         />
@@ -1432,6 +1544,52 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#7A6A5A',
+  },
+  // Promoted placement section
+  promoActiveBox: {
+    backgroundColor: '#D9552B',
+    borderRadius: 10,
+    padding: 14,
+    gap: 4,
+  },
+  promoActiveTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  promoActiveBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  promoPendingBox: {
+    backgroundColor: '#F5EFE6',
+    borderRadius: 10,
+    padding: 14,
+    gap: 4,
+  },
+  promoPendingTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1C1612',
+  },
+  promoBoxBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#7A6A5A',
+  },
+  promoRequestBtn: {
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#D9552B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoRequestBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#D9552B',
   },
   // Inline form error
   formError: {

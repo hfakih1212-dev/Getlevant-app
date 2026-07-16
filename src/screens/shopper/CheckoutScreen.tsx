@@ -35,26 +35,11 @@ interface Voucher {
   discount_pct: number
 }
 
-const PAYMENT_OPTIONS: {
-  value: PaymentMethod
-  label: string
-  description: string
-}[] = [
-  {
-    value: 'whatsapp',
-    label: 'WhatsApp',
-    description: 'Coordinate payment directly with the vendor over WhatsApp',
-  },
-  {
-    value: 'cash_on_delivery',
-    label: 'Cash on Delivery',
-    description: 'Pay in cash when your order arrives at your door',
-  },
-  {
-    value: 'bank_transfer',
-    label: 'Bank Transfer',
-    description: 'Transfer directly to the vendor\'s bank account',
-  },
+// Labels come from the `payment.*` / `payment.*Desc` i18n keys
+const PAYMENT_OPTIONS: { value: PaymentMethod }[] = [
+  { value: 'whatsapp' },
+  { value: 'cash_on_delivery' },
+  { value: 'bank_transfer' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -377,7 +362,7 @@ export default function CheckoutScreen({ navigation }: Props) {
                         isSelected && styles.paymentLabelSelected,
                       ]}
                     >
-                      {opt.label}
+                      {t(`payment.${opt.value}`)}
                     </Text>
                     <Text
                       style={[
@@ -385,7 +370,7 @@ export default function CheckoutScreen({ navigation }: Props) {
                         isSelected && styles.paymentDescSelected,
                       ]}
                     >
-                      {opt.description}
+                      {t(`payment.${opt.value}Desc`)}
                     </Text>
                   </View>
                   <View

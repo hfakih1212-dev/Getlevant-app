@@ -274,14 +274,14 @@ export default function ProfileScreen() {
     const { token, error } = await registerForPushNotifications(user.id)
 
     if (error || !token) {
-      setPushError(error ?? 'Could not register this device.')
+      setPushError(error ?? t('profile.pushFailed'))
     } else {
       setPushToken(token)
       setPushRegistered(true)
     }
 
     setRegistering(false)
-  }, [user?.id])
+  }, [user?.id, t])
 
   // ---- Become a vendor — inline two-step confirm (Alert doesn't fire on web) ----
 
@@ -317,7 +317,7 @@ export default function ProfileScreen() {
 
   const contact = user?.phone ?? user?.email ?? ''
   const initial = contact.trim().replace(/^\+/, '').charAt(0).toUpperCase() || '?'
-  const roleLabel = user?.role === 'vendor' ? 'Vendor' : 'Shopper'
+  const roleLabel = user?.role === 'vendor' ? t('profile.roleVendor') : t('profile.roleShopper')
   const loyalty = getLoyaltyProgress(ordersCount)
 
   // ---- Render ----
@@ -333,7 +333,7 @@ export default function ProfileScreen() {
         >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={styles.headerTitle}>{t('profile.title')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -367,15 +367,17 @@ export default function ProfileScreen() {
           </SectionCard>
 
           {/* ── Loyalty & rewards ── */}
-          <SectionLabel text="Loyalty & Rewards" />
+          <SectionLabel text={t('profile.loyalty')} />
           <View style={styles.loyaltyCard}>
             {/* Tier + order count */}
             <View style={styles.tierRow}>
               <View style={[styles.tierBadge, { backgroundColor: loyalty.tier.color }]}>
-                <Text style={styles.tierBadgeText}>{loyalty.tier.name}</Text>
+                <Text style={styles.tierBadgeText}>{t(`tier.${loyalty.tier.name}`)}</Text>
               </View>
               <Text style={styles.tierOrders}>
-                {ordersCount} completed order{ordersCount !== 1 ? 's' : ''}
+                {ordersCount === 1
+                  ? t('profile.completedOrdersOne')
+                  : t('profile.completedOrdersMany', { n: ordersCount })}
               </Text>
             </View>
 
@@ -387,13 +389,15 @@ export default function ProfileScreen() {
             </View>
             <Text style={styles.progressHint}>
               {loyalty.nextTier
-                ? `${loyalty.ordersToNext} more order${loyalty.ordersToNext !== 1 ? 's' : ''} to reach ${loyalty.nextTier.name}`
-                : 'Top tier unlocked — enjoy Gold status'}
+                ? (loyalty.ordersToNext === 1
+                    ? t('profile.ordersToNextOne', { tier: t(`tier.${loyalty.nextTier.name}`) })
+                    : t('profile.ordersToNextMany', { n: loyalty.ordersToNext, tier: t(`tier.${loyalty.nextTier.name}`) }))
+                : t('profile.topTier')}
             </Text>
 
             {/* Referral code */}
             <View style={styles.referralBlock}>
-              <Text style={styles.loyaltyBlockLabel}>Share my referral code</Text>
+              <Text style={styles.loyaltyBlockLabel}>{t('profile.shareReferral')}</Text>
               <View style={styles.referralRow}>
                 <View style={styles.referralCodeBox}>
                   <Text style={styles.referralCode}>{referralCode ?? '—'}</Text>
@@ -404,18 +408,16 @@ export default function ProfileScreen() {
                   disabled={!referralCode}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.copyBtnText}>{copied ? 'Copied ✓' : 'Copy'}</Text>
+                  <Text style={styles.copyBtnText}>{copied ? t('profile.copied') : t('profile.copy')}</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={styles.referralHint}>
-                Friends mention your code on their first order.
-              </Text>
+              <Text style={styles.referralHint}>{t('profile.referralHint')}</Text>
             </View>
 
             {/* Active vouchers */}
             {vouchers.length > 0 && (
               <View style={styles.voucherBlock}>
-                <Text style={styles.loyaltyBlockLabel}>My vouchers</Text>
+                <Text style={styles.loyaltyBlockLabel}>{t('profile.myVouchers')}</Text>
                 {vouchers.map(v => (
                   <View key={v.id} style={styles.voucherRow}>
                     <Text style={styles.voucherCode}>{v.code}</Text>
@@ -427,15 +429,15 @@ export default function ProfileScreen() {
           </View>
 
           {/* ── Phone number ── */}
-          <SectionLabel text="WhatsApp Contact" />
+          <SectionLabel text={t('profile.whatsappContact')} />
           <SectionCard>
             <View style={styles.phoneRow}>
               <View style={styles.phoneLabelCol}>
-                <Text style={styles.rowLabel}>Phone Number</Text>
-                <Text style={styles.rowHint}>Used to send you order updates via WhatsApp</Text>
+                <Text style={styles.rowLabel}>{t('profile.phoneNumber')}</Text>
+                <Text style={styles.rowHint}>{t('profile.phoneHint')}</Text>
                 {phoneInput.trim().length > 0 && (
                   <Text style={styles.phonePreview}>
-                    Saves as: <Text style={styles.phonePreviewValue}>{normalizedPhone}</Text>
+                    {t('profile.savesAs')} <Text style={styles.phonePreviewValue}>{normalizedPhone}</Text>
                   </Text>
                 )}
               </View>
@@ -465,32 +467,32 @@ export default function ProfileScreen() {
                 {savingPhone ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.phoneSaveBtnText}>Save</Text>
+                  <Text style={styles.phoneSaveBtnText}>{t('profile.save')}</Text>
                 )}
               </TouchableOpacity>
             </View>
           </SectionCard>
 
           {/* ── Notification preferences ── */}
-          <SectionLabel text="Notification Preferences" />
+          <SectionLabel text={t('profile.notifPrefs')} />
           <SectionCard>
             <ToggleRow
-              label="Order Updates"
-              hint="Shipping and status changes for your orders"
+              label={t('profile.orderUpdates')}
+              hint={t('profile.orderUpdatesHint')}
               value={prefs.order_updates}
               onValueChange={v => handleToggle('order_updates', v)}
               loading={savingPref === 'order_updates'}
             />
             <ToggleRow
-              label="Promotional Offers"
-              hint="Deals, new arrivals, and curated picks"
+              label={t('profile.promoOffers')}
+              hint={t('profile.promoOffersHint')}
               value={prefs.promotions}
               onValueChange={v => handleToggle('promotions', v)}
               loading={savingPref === 'promotions'}
             />
             <ToggleRow
-              label="WhatsApp Reminders"
-              hint="Order confirmations and delivery alerts via WhatsApp"
+              label={t('profile.waReminders')}
+              hint={t('profile.waRemindersHint')}
               value={prefs.whatsapp_reminders}
               onValueChange={v => handleToggle('whatsapp_reminders', v)}
               loading={savingPref === 'whatsapp_reminders'}
@@ -502,11 +504,11 @@ export default function ProfileScreen() {
           </SectionCard>
 
           {/* ── Device / Push token ── */}
-          <SectionLabel text="Device Notifications" />
+          <SectionLabel text={t('profile.deviceNotifs')} />
           <SectionCard>
             <InfoRow
-              label="Push Token"
-              value={pushToken ? 'Registered' : 'Not registered'}
+              label={t('profile.pushToken')}
+              value={pushToken ? t('profile.registered') : t('profile.notRegistered')}
             />
             {pushToken ? (
               <View style={[styles.row, styles.rowBorder]}>
@@ -520,7 +522,7 @@ export default function ProfileScreen() {
             ) : null}
             {pushRegistered ? (
               <Text style={[styles.inlineSuccess, styles.inlineErrorPadded]}>
-                Device registered — you'll get order updates here.
+                {t('profile.deviceRegistered')}
               </Text>
             ) : null}
             <View style={[styles.row, styles.rowSingle]}>
@@ -534,7 +536,7 @@ export default function ProfileScreen() {
                   <ActivityIndicator size="small" color="#D9552B" />
                 ) : (
                   <Text style={styles.reregisterBtnText}>
-                    {pushToken ? 'Re-register Device Notifications' : 'Enable Device Notifications'}
+                    {pushToken ? t('profile.reregister') : t('profile.enableNotifs')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -544,14 +546,14 @@ export default function ProfileScreen() {
           {/* ── Become a vendor (shoppers only) ── */}
           {user?.role === 'shopper' && (
             <>
-              <SectionLabel text="Sell on Souk" />
+              <SectionLabel text={t('profile.sellOnSouk')} />
               <SectionCard>
                 <View style={styles.vendorPromo}>
-                  <Text style={styles.vendorPromoTitle}>Become a Vendor</Text>
+                  <Text style={styles.vendorPromoTitle}>{t('profile.becomeVendor')}</Text>
                   <Text style={styles.vendorPromoHint}>
                     {confirmVendor
-                      ? "You'll be taken to set up your store, and your account switches to Vendor mode. Ready?"
-                      : 'List your products and reach shoppers across your region.'}
+                      ? t('profile.becomeVendorConfirm')
+                      : t('profile.becomeVendorHint')}
                   </Text>
                 </View>
                 {vendorError ? (
@@ -564,7 +566,7 @@ export default function ProfileScreen() {
                       onPress={() => setConfirmVendor(false)}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.vendorCancelText}>Not now</Text>
+                      <Text style={styles.vendorCancelText}>{t('profile.notNow')}</Text>
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
@@ -577,7 +579,7 @@ export default function ProfileScreen() {
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <Text style={styles.vendorBtnText}>
-                        {confirmVendor ? 'Yes, open my store' : 'Start Selling'}
+                        {confirmVendor ? t('profile.yesOpenStore') : t('profile.startSelling')}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -617,7 +619,7 @@ export default function ProfileScreen() {
           </SectionCard>
 
           {/* ── Sign out ── */}
-          <SectionLabel text="Account" />
+          <SectionLabel text={t('profile.account')} />
           <SectionCard>
             {confirmSignOut ? (
               <View style={styles.signOutConfirmRow}>
@@ -626,7 +628,7 @@ export default function ProfileScreen() {
                   onPress={() => setConfirmSignOut(false)}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.signOutCancelText}>Cancel</Text>
+                  <Text style={styles.signOutCancelText}>{t('profile.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.signOutConfirmBtn}
@@ -636,7 +638,7 @@ export default function ProfileScreen() {
                 >
                   {signingOut
                     ? <ActivityIndicator size="small" color="#FFFFFF" />
-                    : <Text style={styles.signOutConfirmText}>Yes, sign out</Text>
+                    : <Text style={styles.signOutConfirmText}>{t('profile.yesSignOut')}</Text>
                   }
                 </TouchableOpacity>
               </View>
@@ -646,7 +648,7 @@ export default function ProfileScreen() {
                 onPress={handleSignOut}
                 activeOpacity={0.8}
               >
-                <Text style={styles.signOutText}>Sign Out</Text>
+                <Text style={styles.signOutText}>{t('profile.signOut')}</Text>
               </TouchableOpacity>
             )}
           </SectionCard>

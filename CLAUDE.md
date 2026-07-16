@@ -135,12 +135,31 @@ npx supabase secrets set KEY=value --project-ref fhsnjdwciwzpkzwvcbrl
 
 ## Pending / Known Issues
 - WhatsApp notifications deployed but `WHATSAPP_API_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` secrets not set
-- Push notifications require a fresh dev build under the NEW app id `com.souklb.app`
-  (bundle ids changed from com.anonymous.soukapp on 2026-07-05 — old installs are a separate app)
-- i18n: EN/AR/FR cover the shopper funnel (feed, product, cart, login, checkout) via
-  `src/lib/i18n.ts`; vendor screens, profile bulk, payment-method labels, and a proper
-  RTL layout pass (I18nManager) are follow-ups
+- Migration `20260717000000_promotion_requests.sql` written but NOT pushed to the remote DB yet
+  (db push needs interactive approval) — run `npx supabase db push --project-ref fhsnjdwciwzpkzwvcbrl`
+  before the promotion-request UI can submit
+- RTL: infrastructure is wired (web flips document.dir immediately; native uses
+  I18nManager and applies on next app launch) but no visual QA pass has been done
+  in Arabic yet — layouts may need per-screen fixes
+- Push notifications: dev-build APK under `com.souklb.app` built 2026-07-17
+  (EAS build da0b938b) — needs a device install + end-to-end push test
+- Store screenshots not captured yet (copy is done — see `store-listing/listing-copy.md`)
 - Referral payoff mints vouchers on first *delivered* order (milestone 0 = referral reward)
+
+## Recently shipped (2026-07-17)
+- Promotion purchase-request flow: `promotion_requests` table (RLS: vendor
+  insert/select own store only, one pending per product) + admin-only
+  `approve_promotion_request()` / `reject_promotion_request()` SQL helpers
+  (execute revoked from app roles; approval stacks onto an existing expiry).
+  Vendor UI: "Promoted Placement" section in ProductManagement edit mode —
+  pick 7/30 days, request, team arranges payment over WhatsApp (off-platform,
+  consistent with checkout)
+- i18n complete: all vendor screens, Profile, payment-method labels, order
+  status/category/condition/region labels now EN/AR/FR; keys use enum-suffix
+  pattern (`t(\`status.${status}\`)`); RTL wiring in `src/lib/i18n.ts`
+- Alert.alert eliminated from vendor flows: dashboard cancel-order is an
+  inline two-tap confirm, shipment-create failure is inline error text
+- Store-listing copy (EN/AR/FR titles, descriptions, keywords) in `store-listing/`
 
 ## Recently shipped (2026-07-10, ads & promotion)
 - `products.is_promoted` / `promotion_expires_at` + service-role-only guard trigger

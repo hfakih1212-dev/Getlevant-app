@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { useT } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/useAuthStore'
 import type { VendorStackParamList } from '../../navigation/RootNavigator'
@@ -56,6 +57,7 @@ function normalizePhone(raw: string): string {
 
 export default function StoreOnboardingScreen({ navigation }: Props) {
   const user = useAuthStore(s => s.user)
+  const t = useT()
 
   const [name,        setName]        = useState('')
   const [description, setDescription] = useState('')
@@ -77,7 +79,7 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
     setFormError(null)
 
     if (!name.trim()) {
-      setFormError('Store name is required.')
+      setFormError(t('onboarding.nameRequired'))
       return
     }
     if (!user?.id) return
@@ -103,7 +105,7 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
 
     // Replace this screen with a fresh VendorDashboard — store now exists
     navigation.replace('VendorDashboard')
-  }, [name, description, normalizedPhone, region, user?.id, navigation])
+  }, [name, description, normalizedPhone, region, user?.id, navigation, t])
 
   // ---- Render ----
   return (
@@ -128,38 +130,35 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
 
           {/* ── Welcome copy ── */}
           <View style={styles.welcome}>
-            <Text style={styles.welcomeTitle}>Open Your Store</Text>
-            <Text style={styles.welcomeBody}>
-              You're one step away from reaching customers across Lebanon.
-              Fill in your store details to get started.
-            </Text>
+            <Text style={styles.welcomeTitle}>{t('onboarding.title')}</Text>
+            <Text style={styles.welcomeBody}>{t('onboarding.body')}</Text>
           </View>
 
           {/* ── Store details ── */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Store Details</Text>
+            <Text style={styles.sectionTitle}>{t('onboarding.storeDetails')}</Text>
 
             <Text style={styles.inputLabel}>
-              Store Name <Text style={styles.required}>*</Text>
+              {t('onboarding.storeName')} <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={styles.input}
               value={name}
               onChangeText={setName}
-              placeholder="e.g. Nour Handmade Jewelry"
+              placeholder={t('onboarding.storeNamePlaceholder')}
               placeholderTextColor="#B0A090"
               returnKeyType="next"
               autoCapitalize="words"
             />
 
             <Text style={styles.inputLabel}>
-              Description <Text style={styles.optional}>(optional)</Text>
+              {t('onboarding.description')} <Text style={styles.optional}>{t('common.optional')}</Text>
             </Text>
             <TextInput
               style={[styles.input, styles.inputMultiline]}
               value={description}
               onChangeText={setDescription}
-              placeholder="Tell shoppers what makes your store special…"
+              placeholder={t('onboarding.descriptionPlaceholder')}
               placeholderTextColor="#B0A090"
               multiline
               numberOfLines={3}
@@ -169,16 +168,16 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
 
           {/* ── Contact ── */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Contact</Text>
+            <Text style={styles.sectionTitle}>{t('onboarding.contact')}</Text>
 
             <Text style={styles.inputLabel}>
-              WhatsApp Number <Text style={styles.optional}>(optional)</Text>
+              {t('onboarding.whatsappNumber')} <Text style={styles.optional}>{t('common.optional')}</Text>
             </Text>
             <TextInput
               style={styles.input}
               value={whatsapp}
               onChangeText={setWhatsapp}
-              placeholder="+961 70 123 456 or 03 123 456"
+              placeholder="+961 70 123 456 / 03 123 456"
               placeholderTextColor="#B0A090"
               keyboardType="phone-pad"
               returnKeyType="done"
@@ -186,22 +185,18 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
             {/* Live normalization preview */}
             {whatsapp.trim().length > 0 && (
               <Text style={styles.phonePreview}>
-                Saved as: <Text style={styles.phonePreviewValue}>{normalizedPhone}</Text>
+                {t('onboarding.savedAs')} <Text style={styles.phonePreviewValue}>{normalizedPhone}</Text>
               </Text>
             )}
-            <Text style={styles.fieldHint}>
-              Local formats (03…, 70…) are automatically converted to international format.
-            </Text>
+            <Text style={styles.fieldHint}>{t('onboarding.phoneHint')}</Text>
           </View>
 
           {/* ── Region ── */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              Region <Text style={styles.optional}>(optional)</Text>
+              {t('onboarding.region')} <Text style={styles.optional}>{t('common.optional')}</Text>
             </Text>
-            <Text style={styles.fieldHint}>
-              Select your primary area, or leave blank if you deliver nationwide.
-            </Text>
+            <Text style={styles.fieldHint}>{t('onboarding.regionHint')}</Text>
 
             <View style={styles.pillGrid}>
               {LEBANON_REGIONS.map(r => {
@@ -214,7 +209,7 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
                     activeOpacity={0.75}
                   >
                     <Text style={[styles.pillText, selected && styles.pillTextSelected]}>
-                      {r}
+                      {t(`region.${r}`)}
                     </Text>
                   </TouchableOpacity>
                 )
@@ -241,7 +236,7 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
           >
             {saving
               ? <ActivityIndicator color="#FFFFFF" />
-              : <Text style={styles.submitBtnText}>Open My Store</Text>
+              : <Text style={styles.submitBtnText}>{t('onboarding.submit')}</Text>
             }
           </TouchableOpacity>
         </View>

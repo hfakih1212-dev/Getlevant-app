@@ -322,6 +322,61 @@ export type Database = {
           },
         ]
       }
+      promotion_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          duration_days: number
+          id: string
+          product_id: string
+          requested_by: string
+          status: string
+          store_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          duration_days: number
+          id?: string
+          product_id: string
+          requested_by: string
+          status?: string
+          store_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          duration_days?: number
+          id?: string
+          product_id?: string
+          requested_by?: string
+          status?: string
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotion_requests_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_requests_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           comment: string | null

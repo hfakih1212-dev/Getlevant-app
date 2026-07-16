@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react'
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,6 +11,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { TranslationKey, useT } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import { Database } from '../../types/supabase'
 import type { VendorStackParamList } from '../../navigation/RootNavigator'
@@ -20,17 +20,18 @@ type Props = NativeStackScreenProps<VendorStackParamList, 'ShipmentCreate'>
 type CourierType = Database['public']['Enums']['courier_type']
 
 // ---------------------------------------------------------------------------
-// Courier options
+// Courier options — `label` (English) is also what's written into the
+// shipment-event description, so it stays fixed; labelKey localizes display
 // ---------------------------------------------------------------------------
 
-const COURIER_OPTIONS: { value: CourierType; label: string }[] = [
-  { value: 'aramex',        label: 'Aramex'        },
-  { value: 'dhl',           label: 'DHL'           },
-  { value: 'fedex',         label: 'FedEx'         },
-  { value: 'tnt',           label: 'TNT'           },
-  { value: 'local_courier', label: 'Local Courier' },
-  { value: 'internal',      label: 'Internal'      },
-  { value: 'other',         label: 'Other'         },
+const COURIER_OPTIONS: { value: CourierType; label: string; labelKey?: TranslationKey }[] = [
+  { value: 'aramex',        label: 'Aramex' },
+  { value: 'dhl',           label: 'DHL'    },
+  { value: 'fedex',         label: 'FedEx'  },
+  { value: 'tnt',           label: 'TNT'    },
+  { value: 'local_courier', label: 'Local Courier', labelKey: 'shipment.localCourier' },
+  { value: 'internal',      label: 'Internal',      labelKey: 'shipment.internal'     },
+  { value: 'other',         label: 'Other',         labelKey: 'shipment.other'        },
 ]
 
 // ---------------------------------------------------------------------------
@@ -39,12 +40,14 @@ const COURIER_OPTIONS: { value: CourierType; label: string }[] = [
 
 export default function ShipmentCreateScreen({ route, navigation }: Props) {
   const { orderId, orderNumber } = route.params
+  const t = useT()
 
   const [courierType,   setCourierType]   = useState<CourierType | null>(null)
   const [courierName,   setCourierName]   = useState('')
   const [trackingId,    setTrackingId]    = useState('')
   const [courierPhone,  setCourierPhone]  = useState('')
   const [submitting,    setSubmitting]    = useState(false)
+  const [submitError,   setSubmitError]   = useState<string | null>(null)
 
   const canSubmit =
     courierType !== null &&
@@ -54,6 +57,7 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
   const handleSubmit = useCallback(async () => {
     if (!canSubmit) return
     setSubmitting(true)
+    setSubmitError(null)
 
     const { data: shipment, error } = await supabase
       .from('shipments')
@@ -69,7 +73,7 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
       .single()
 
     if (error || !shipment) {
-      Alert.alert('Failed to Create Shipment', error?.message ?? 'Unknown error')
+      setSubmitError(t('shipment.failed', { msg: error?.message ?? '—' }))
       setSubmitting(false)
       return
     }
@@ -84,7 +88,7 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
 
     await supabase.from('orders').update({ status: 'dispatched' }).eq('id', orderId)
     navigation.goBack()
-  }, [canSubmit, orderId, courierType, courierName, trackingId, courierPhone, navigation])
+  }, [canSubmit, orderId, courierType, courierName, trackingId, courierPhone, navigation, t])
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -102,7 +106,7 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>Assign Courier</Text>
+            <Text style={styles.headerTitle}>{t('shipment.title')}</Text>
             <Text style={styles.headerSub}>{orderNumber}</Text>
           </View>
           <View style={styles.headerRight} />
@@ -116,7 +120,7 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
         >
           {/* ── Courier type ── */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Courier Service</Text>
+            <Text style={styles.sectionTitle}>{t('shipment.courierService')}</Text>
             <View style={styles.pillGrid}>
               {COURIER_OPTIONS.map((opt) => {
                 const selected = courierType === opt.value
@@ -130,7 +134,7 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
                     <Text
                       style={[styles.pillText, selected && styles.pillTextSelected]}
                     >
-                      {opt.label}
+                      {opt.labelKey ? t(opt.labelKey) : opt.label}
                     </Text>
                   </TouchableOpacity>
                 )
@@ -140,21 +144,21 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
 
           {/* ── Courier details ── */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Courier Details</Text>
+            <Text style={styles.sectionTitle}>{t('shipment.courierDetails')}</Text>
 
             <Text style={styles.inputLabel}>
-              Courier Name <Text style={styles.required}>*</Text>
+              {t('shipment.courierName')} <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={styles.input}
               value={courierName}
               onChangeText={setCourierName}
-              placeholder="Full name or branch (e.g. John — Beirut Hub)"
+              placeholder={t('shipment.courierNamePlaceholder')}
               placeholderTextColor="#B0A090"
               returnKeyType="next"
             />
 
-            <Text style={styles.inputLabel}>Tracking ID <Text style={styles.optional}>(optional)</Text></Text>
+            <Text style={styles.inputLabel}>{t('shipment.trackingId')} <Text style={styles.optional}>{t('common.optional')}</Text></Text>
             <TextInput
               style={[styles.input, styles.inputMono]}
               value={trackingId}
@@ -165,7 +169,7 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
               returnKeyType="next"
             />
 
-            <Text style={styles.inputLabel}>Courier Phone <Text style={styles.optional}>(optional)</Text></Text>
+            <Text style={styles.inputLabel}>{t('shipment.courierPhone')} <Text style={styles.optional}>{t('common.optional')}</Text></Text>
             <TextInput
               style={styles.input}
               value={courierPhone}
@@ -180,6 +184,9 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
 
         {/* ── Sticky bottom ── */}
         <View style={styles.bottomBar}>
+          {submitError ? (
+            <Text style={styles.submitError}>{submitError}</Text>
+          ) : null}
           <TouchableOpacity
             style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
             onPress={handleSubmit}
@@ -187,7 +194,7 @@ export default function ShipmentCreateScreen({ route, navigation }: Props) {
             activeOpacity={0.85}
           >
             <Text style={styles.submitBtnText}>
-              {submitting ? 'Assigning…' : 'Assign Courier'}
+              {submitting ? t('shipment.assigning') : t('shipment.assign')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -306,6 +313,12 @@ const styles = StyleSheet.create({
   },
   inputMono: {
     letterSpacing: 0.5,
+  },
+  submitError: {
+    fontSize: 13,
+    color: '#D9552B',
+    textAlign: 'center',
+    paddingBottom: 10,
   },
   // Bottom bar
   bottomBar: {

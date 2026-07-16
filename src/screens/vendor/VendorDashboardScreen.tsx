@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   ListRenderItem,
   ScrollView,
@@ -14,7 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import Skeleton from '../../components/Skeleton'
-import { CATEGORY_LABEL, CONDITION_OPTIONS } from '../../lib/catalog'
+import { CATEGORY_LABEL, CONDITION_OPTIONS, LEBANON_REGIONS, LebanonRegion, ProductCategory } from '../../lib/catalog'
+import { TranslationKey, useT } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import { notifyStatusChanged } from '../../lib/whatsapp'
 import { pushNotifyStatusChanged } from '../../lib/push'
@@ -76,11 +76,17 @@ type OrderItem = VendorOrder['order_items'][0]
 
 type TabKey = 'pending' | 'active' | 'completed'
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'pending',   label: 'Pending'   },
-  { key: 'active',    label: 'Active'    },
-  { key: 'completed', label: 'Completed' },
+const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
+  { key: 'pending',   labelKey: 'vendorDash.tabPending'   },
+  { key: 'active',    labelKey: 'vendorDash.tabActive'    },
+  { key: 'completed', labelKey: 'vendorDash.tabCompleted' },
 ]
+
+const TAB_EMPTY_KEY: Record<TabKey, TranslationKey> = {
+  pending:   'vendorDash.emptyPending',
+  active:    'vendorDash.emptyActive',
+  completed: 'vendorDash.emptyCompleted',
+}
 
 const TAB_STATUSES: Record<TabKey, OrderStatus[]> = {
   pending:   ['placed'],
@@ -93,30 +99,27 @@ const TAB_STATUSES: Record<TabKey, OrderStatus[]> = {
 // ---------------------------------------------------------------------------
 
 const NEXT_ACTION: Partial<
-  Record<OrderStatus, { label: string; next: OrderStatus }>
+  Record<OrderStatus, { labelKey: TranslationKey; next: OrderStatus }>
 > = {
-  placed:     { label: 'Accept Order',      next: 'confirmed'  },
-  confirmed:  { label: 'Start Preparing',   next: 'preparing'  },
-  preparing:  { label: 'Mark as Ready',     next: 'ready'      },
-  ready:      { label: 'Dispatch Order',    next: 'dispatched' },
-  dispatched: { label: 'Mark as Delivered', next: 'delivered'  },
+  placed:     { labelKey: 'vendorDash.actionAccept',         next: 'confirmed'  },
+  confirmed:  { labelKey: 'vendorDash.actionStartPreparing', next: 'preparing'  },
+  preparing:  { labelKey: 'vendorDash.actionMarkReady',      next: 'ready'      },
+  ready:      { labelKey: 'vendorDash.actionDispatch',       next: 'dispatched' },
+  dispatched: { labelKey: 'vendorDash.actionMarkDelivered',  next: 'delivered'  },
 }
 
 // ---------------------------------------------------------------------------
-// Status badge styling
+// Status badge styling — labels come from the `status.*` i18n keys
 // ---------------------------------------------------------------------------
 
-const STATUS_BADGE: Record<
-  OrderStatus,
-  { label: string; color: string; bg: string }
-> = {
-  placed:     { label: 'Placed',     color: '#92400E', bg: '#FEF3C7' },
-  confirmed:  { label: 'Confirmed',  color: '#1E3A8A', bg: '#DBEAFE' },
-  preparing:  { label: 'Preparing',  color: '#5B21B6', bg: '#EDE9FE' },
-  ready:      { label: 'Ready',      color: '#065F46', bg: '#D1FAE5' },
-  dispatched: { label: 'Dispatched', color: '#9A3412', bg: '#FFEDD5' },
-  delivered:  { label: 'Delivered',  color: '#166534', bg: '#DCFCE7' },
-  cancelled:  { label: 'Cancelled',  color: '#6B7280', bg: '#F3F4F6' },
+const STATUS_BADGE: Record<OrderStatus, { color: string; bg: string }> = {
+  placed:     { color: '#92400E', bg: '#FEF3C7' },
+  confirmed:  { color: '#1E3A8A', bg: '#DBEAFE' },
+  preparing:  { color: '#5B21B6', bg: '#EDE9FE' },
+  ready:      { color: '#065F46', bg: '#D1FAE5' },
+  dispatched: { color: '#9A3412', bg: '#FFEDD5' },
+  delivered:  { color: '#166534', bg: '#DCFCE7' },
+  cancelled:  { color: '#6B7280', bg: '#F3F4F6' },
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +140,7 @@ function resolveOne<T>(val: T | T[] | null | undefined): T | null {
   return Array.isArray(val) ? (val[0] ?? null) : val
 }
 
-function formatItemLine(item: OrderItem): string {
+function formatItemLine(item: OrderItem, fallbackName: string): string {
   const product = resolveOne(item.product as { name: string } | { name: string }[] | null)
   const variant = resolveOne(
     item.variant as
@@ -145,7 +148,7 @@ function formatItemLine(item: OrderItem): string {
       | { size: string | null; color: string | null }[]
       | null,
   )
-  const name = product?.name ?? 'Item'
+  const name = product?.name ?? fallbackName
   const opts = [variant?.size, variant?.color].filter(Boolean).join(' / ')
   return `${item.quantity}× ${name}${opts ? ` (${opts})` : ''}`
 }
@@ -154,8 +157,12 @@ function formatItemLine(item: OrderItem): string {
 // AnalyticsStrip — horizontally scrolling stat cards above the order tabs
 // ---------------------------------------------------------------------------
 
-function categoryLabel(value: string): string {
-  return (CATEGORY_LABEL as Record<string, string>)[value] ?? 'Uncategorized'
+function isKnownCategory(value: string): value is ProductCategory {
+  return value in CATEGORY_LABEL
+}
+
+function isKnownRegion(value: string): value is LebanonRegion {
+  return (LEBANON_REGIONS as readonly string[]).includes(value)
 }
 
 function pct(part: number, total: number): string {
@@ -170,6 +177,7 @@ type AnalyticsStripProps = {
 }
 
 function AnalyticsStrip({ stats, loading, error }: AnalyticsStripProps) {
+  const t = useT()
   if (loading) {
     return (
       <ScrollView
@@ -190,12 +198,12 @@ function AnalyticsStrip({ stats, loading, error }: AnalyticsStripProps) {
   }
 
   if (error) {
-    return <Text style={styles.statsError}>Couldn't load analytics: {error}</Text>
+    return <Text style={styles.statsError}>{t('vendorDash.analyticsError', { msg: error })}</Text>
   }
   if (!stats) return null
 
   const conditionEntries = CONDITION_OPTIONS.map(o => ({
-    label: o.label,
+    label: t(`condition.${o.value}`),
     units: stats.items_by_condition[o.value] ?? 0,
   }))
   const itemsTotal    = conditionEntries.reduce((sum, e) => sum + e.units, 0)
@@ -211,23 +219,23 @@ function AnalyticsStrip({ stats, loading, error }: AnalyticsStripProps) {
     >
       {/* Total revenue */}
       <View style={styles.statCard}>
-        <Text style={styles.statLabel}>Total Revenue</Text>
+        <Text style={styles.statLabel}>{t('vendorDash.statRevenue')}</Text>
         <Text style={styles.statValue}>${Number(stats.total_revenue_usd).toFixed(0)}</Text>
-        <Text style={styles.statSub}>Delivered sales, USD</Text>
+        <Text style={styles.statSub}>{t('vendorDash.statRevenueSub')}</Text>
       </View>
 
       {/* Orders processed */}
       <View style={styles.statCard}>
-        <Text style={styles.statLabel}>Orders</Text>
+        <Text style={styles.statLabel}>{t('vendorDash.statOrders')}</Text>
         <Text style={styles.statValue}>{stats.orders_delivered}</Text>
-        <Text style={styles.statSub}>Delivered to buyers</Text>
+        <Text style={styles.statSub}>{t('vendorDash.statOrdersSub')}</Text>
       </View>
 
       {/* Brand New vs Thrifted */}
       <View style={[styles.statCard, styles.statCardWide]}>
-        <Text style={styles.statLabel}>Items Sold</Text>
+        <Text style={styles.statLabel}>{t('vendorDash.statItemsSold')}</Text>
         {itemsTotal === 0 ? (
-          <Text style={styles.statSub}>No sales yet</Text>
+          <Text style={styles.statSub}>{t('vendorDash.noSalesYet')}</Text>
         ) : (
           conditionEntries.map(e => (
             <View key={e.label} style={styles.breakdownRow}>
@@ -241,14 +249,14 @@ function AnalyticsStrip({ stats, loading, error }: AnalyticsStripProps) {
 
       {/* Top categories */}
       <View style={[styles.statCard, styles.statCardWide]}>
-        <Text style={styles.statLabel}>Top Categories</Text>
+        <Text style={styles.statLabel}>{t('vendorDash.statTopCategories')}</Text>
         {stats.top_categories.length === 0 ? (
-          <Text style={styles.statSub}>No sales yet</Text>
+          <Text style={styles.statSub}>{t('vendorDash.noSalesYet')}</Text>
         ) : (
           stats.top_categories.slice(0, 3).map((c, i) => (
             <View key={c.category} style={styles.breakdownRow}>
               <Text style={styles.breakdownName} numberOfLines={1}>
-                {i + 1}. {categoryLabel(c.category)}
+                {i + 1}. {isKnownCategory(c.category) ? t(`catalog.${c.category}`) : t('vendorDash.uncategorized')}
               </Text>
               <Text style={styles.breakdownUnits}>{c.units}</Text>
               <Text style={styles.breakdownPct}>{pct(c.units, categoryTotal)}</Text>
@@ -259,13 +267,15 @@ function AnalyticsStrip({ stats, loading, error }: AnalyticsStripProps) {
 
       {/* Regional reach */}
       <View style={[styles.statCard, styles.statCardWide]}>
-        <Text style={styles.statLabel}>Regional Reach</Text>
+        <Text style={styles.statLabel}>{t('vendorDash.statRegionalReach')}</Text>
         {stats.regions.length === 0 ? (
-          <Text style={styles.statSub}>No orders yet</Text>
+          <Text style={styles.statSub}>{t('vendorDash.noOrdersYet')}</Text>
         ) : (
           stats.regions.slice(0, 3).map(r => (
             <View key={r.region} style={styles.breakdownRow}>
-              <Text style={styles.breakdownName} numberOfLines={1}>{r.region}</Text>
+              <Text style={styles.breakdownName} numberOfLines={1}>
+                {isKnownRegion(r.region) ? t(`region.${r.region}`) : r.region}
+              </Text>
               <Text style={styles.breakdownUnits}>{r.orders}</Text>
               <Text style={styles.breakdownPct}>{pct(r.orders, regionTotal)}</Text>
             </View>
@@ -286,9 +296,11 @@ type CardProps = {
   advancing: boolean
   onCreateShipment: (orderId: string, orderNumber: string) => void
   onCancel: (orderId: string) => void
+  cancelConfirming: boolean
 }
 
-function OrderCard({ order, onAdvance, advancing, onCreateShipment, onCancel }: CardProps) {
+function OrderCard({ order, onAdvance, advancing, onCreateShipment, onCancel, cancelConfirming }: CardProps) {
+  const t = useT()
   const badge  = STATUS_BADGE[order.status]
   const action = NEXT_ACTION[order.status]
   const isPrimary = order.status === 'placed'
@@ -308,7 +320,7 @@ function OrderCard({ order, onAdvance, advancing, onCreateShipment, onCancel }: 
         <Text style={styles.orderNumber}>{order.order_number ?? '—'}</Text>
         <View style={[styles.badge, { backgroundColor: badge.bg }]}>
           <Text style={[styles.badgeText, { color: badge.color }]}>
-            {badge.label}
+            {t(`status.${order.status}`)}
           </Text>
         </View>
       </View>
@@ -329,14 +341,14 @@ function OrderCard({ order, onAdvance, advancing, onCreateShipment, onCancel }: 
       <View style={styles.itemsSection}>
         {order.order_items.map(item => (
           <Text key={item.id} style={styles.itemLine}>
-            • {formatItemLine(item)}
+            • {formatItemLine(item, t('vendorDash.item'))}
           </Text>
         ))}
       </View>
 
       {/* ── Total ── */}
       <View style={styles.totalRow}>
-        <Text style={styles.totalLabel}>Total</Text>
+        <Text style={styles.totalLabel}>{t('vendorDash.total')}</Text>
         <Text style={styles.totalValue}>
           ${Number(order.total_usd).toFixed(2)} USD
         </Text>
@@ -366,7 +378,7 @@ function OrderCard({ order, onAdvance, advancing, onCreateShipment, onCancel }: 
                 !isPrimary && styles.actionBtnTextOutline,
               ]}
             >
-              {action.label}
+              {t(action.labelKey)}
             </Text>
           )}
         </TouchableOpacity>
@@ -379,18 +391,20 @@ function OrderCard({ order, onAdvance, advancing, onCreateShipment, onCancel }: 
           onPress={() => onCreateShipment(order.id, order.order_number ?? '')}
           activeOpacity={0.8}
         >
-          <Text style={styles.shipmentBtnText}>Assign Courier</Text>
+          <Text style={styles.shipmentBtnText}>{t('vendorDash.assignCourier')}</Text>
         </TouchableOpacity>
       ) : null}
 
-      {/* ── Cancel — only for pre-dispatch statuses ── */}
+      {/* ── Cancel — inline two-tap confirm (Alert is a no-op on web) ── */}
       {(order.status === 'placed' || order.status === 'confirmed' || order.status === 'preparing') ? (
         <TouchableOpacity
-          style={styles.cancelBtn}
+          style={[styles.cancelBtn, cancelConfirming && styles.cancelBtnConfirming]}
           onPress={() => onCancel(order.id)}
           activeOpacity={0.8}
         >
-          <Text style={styles.cancelBtnText}>Cancel Order</Text>
+          <Text style={[styles.cancelBtnText, cancelConfirming && styles.cancelBtnTextConfirming]}>
+            {cancelConfirming ? t('vendorDash.cancelConfirm') : t('vendorDash.cancelOrder')}
+          </Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -403,6 +417,7 @@ function OrderCard({ order, onAdvance, advancing, onCreateShipment, onCancel }: 
 
 export default function VendorDashboardScreen({ navigation }: Props) {
   const user = useAuthStore(s => s.user)
+  const t = useT()
 
   const [orders, setOrders]       = useState<VendorOrder[]>([])
   const [storeName, setStoreName] = useState<string>('')
@@ -410,6 +425,7 @@ export default function VendorDashboardScreen({ navigation }: Props) {
   const [error, setError]         = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('pending')
   const [advancingId, setAdvancingId] = useState<string | null>(null)
+  const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null)
 
   // Analytics — loads independently of orders so skeletons cover the RPC
   const [stats,        setStats]        = useState<VendorAnalytics | null>(null)
@@ -545,35 +561,28 @@ export default function VendorDashboardScreen({ navigation }: Props) {
     [],
   )
 
-  // ---- Order cancellation ----
+  // ---- Order cancellation — first tap arms, second tap executes ----
 
   const handleCancel = useCallback(
-    (orderId: string) => {
-      Alert.alert(
-        'Cancel Order',
-        'Are you sure you want to cancel this order? This cannot be undone.',
-        [
-          { text: 'Keep Order', style: 'cancel' },
-          {
-            text: 'Cancel Order',
-            style: 'destructive',
-            onPress: async () => {
-              const { error: updateErr } = await supabase
-                .from('orders')
-                .update({ status: 'cancelled' })
-                .eq('id', orderId)
+    async (orderId: string) => {
+      if (confirmingCancelId !== orderId) {
+        setConfirmingCancelId(orderId)
+        return
+      }
+      setConfirmingCancelId(null)
 
-              if (!updateErr) {
-                setOrders(prev =>
-                  prev.map(o => (o.id === orderId ? { ...o, status: 'cancelled' } : o)),
-                )
-              }
-            },
-          },
-        ],
-      )
+      const { error: updateErr } = await supabase
+        .from('orders')
+        .update({ status: 'cancelled' })
+        .eq('id', orderId)
+
+      if (!updateErr) {
+        setOrders(prev =>
+          prev.map(o => (o.id === orderId ? { ...o, status: 'cancelled' } : o)),
+        )
+      }
     },
-    [],
+    [confirmingCancelId],
   )
 
   // ---- Shipment creation ----
@@ -595,9 +604,10 @@ export default function VendorDashboardScreen({ navigation }: Props) {
         advancing={advancingId === item.id}
         onCreateShipment={handleCreateShipment}
         onCancel={handleCancel}
+        cancelConfirming={confirmingCancelId === item.id}
       />
     ),
-    [handleAdvance, advancingId, handleCreateShipment, handleCancel],
+    [handleAdvance, advancingId, handleCreateShipment, handleCancel, confirmingCancelId],
   )
 
   const keyExtractor = useCallback((item: VendorOrder) => item.id, [])
@@ -617,7 +627,7 @@ export default function VendorDashboardScreen({ navigation }: Props) {
       <SafeAreaView style={[styles.safe, styles.centered]}>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={load}>
-          <Text style={styles.retryText}>Retry</Text>
+          <Text style={styles.retryText}>{t('common.retry')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     )
@@ -631,14 +641,14 @@ export default function VendorDashboardScreen({ navigation }: Props) {
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>{storeName}</Text>
-          <Text style={styles.headerSub}>Order Management</Text>
+          <Text style={styles.headerSub}>{t('vendorDash.orderManagement')}</Text>
         </View>
         <TouchableOpacity
           style={styles.inventoryBtn}
           onPress={() => navigation.navigate('ProductManagement')}
           activeOpacity={0.8}
         >
-          <Text style={styles.inventoryBtnText}>Inventory</Text>
+          <Text style={styles.inventoryBtnText}>{t('vendorDash.inventory')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.settingsBtn}
@@ -675,7 +685,7 @@ export default function VendorDashboardScreen({ navigation }: Props) {
               activeOpacity={0.7}
             >
               <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
               {count > 0 && (
                 <View
@@ -706,7 +716,7 @@ export default function VendorDashboardScreen({ navigation }: Props) {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
-              No {activeTab} orders right now.
+              {t(TAB_EMPTY_KEY[activeTab])}
             </Text>
           </View>
         }
@@ -1069,6 +1079,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#6B7280',
+  },
+  cancelBtnConfirming: {
+    borderColor: '#D9552B',
+    backgroundColor: '#FFF3EC',
+  },
+  cancelBtnTextConfirming: {
+    color: '#D9552B',
   },
   // Assign courier secondary button
   shipmentBtn: {

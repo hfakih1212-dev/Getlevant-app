@@ -52,7 +52,7 @@ export type VendorStackParamList = {
 }
 
 // ---------------------------------------------------------------------------
-// Deep links — souk://product/<id> on native, /product/<id> on web.
+// Deep links — levant://product/<id> on native, /product/<id> on web.
 // Vendor screens are deliberately unmapped; shared links always target the
 // shopper surface.
 // ---------------------------------------------------------------------------

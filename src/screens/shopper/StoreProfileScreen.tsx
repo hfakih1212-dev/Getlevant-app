@@ -160,7 +160,7 @@ export default function StoreProfileScreen({ route, navigation }: Props) {
   const handleShare = useCallback(async () => {
     if (!store) return
     const outcome = await shareLink(
-      `Check out ${store.name} on Souk — local boutiques, delivered`,
+      `Check out ${store.name} on Levant — local boutiques, delivered`,
       storeLink(store.id),
     )
     if (outcome === 'copied') {

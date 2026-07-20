@@ -125,7 +125,7 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
             <View style={styles.brandMark}>
               <Text style={styles.brandMarkText}>S</Text>
             </View>
-            <Text style={styles.brandName}>Souk</Text>
+            <Text style={styles.brandName}>Levant</Text>
           </View>
 
           {/* ── Welcome copy ── */}

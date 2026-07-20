@@ -546,7 +546,7 @@ export default function ProfileScreen() {
           {/* ── Become a vendor (shoppers only) ── */}
           {user?.role === 'shopper' && (
             <>
-              <SectionLabel text={t('profile.sellOnSouk')} />
+              <SectionLabel text={t('profile.sellOnLevant')} />
               <SectionCard>
                 <View style={styles.vendorPromo}>
                   <Text style={styles.vendorPromoTitle}>{t('profile.becomeVendor')}</Text>

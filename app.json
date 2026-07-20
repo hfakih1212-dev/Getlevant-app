@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "Souk",
+    "name": "Levant",
     "slug": "souk-app",
-    "scheme": "souk",
+    "scheme": "levant",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.souklb.app",
+      "bundleIdentifier": "com.levant.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -22,7 +22,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.souklb.app"
+      "package": "com.levant.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"

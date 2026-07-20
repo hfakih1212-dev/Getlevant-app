@@ -17,7 +17,7 @@ export const LOCALE_OPTIONS: { value: Locale; label: string }[] = [
   { value: 'fr', label: 'Français' },
 ]
 
-const STORAGE_KEY = 'souk.locale'
+const STORAGE_KEY = 'levant.locale'
 
 const en = {
   // Shared
@@ -41,7 +41,7 @@ const en = {
   'feed.noMatches': 'No matches',
   'feed.nothingYet': 'Nothing here yet',
   'feed.tryDifferent': 'Try a different search, category, or region.',
-  'feed.newBoutiques': 'New boutiques are joining Souk every day.',
+  'feed.newBoutiques': 'New boutiques are joining Levant every day.',
   'feed.clearFilters': 'Clear filters',
   'feed.sponsored': 'Sponsored',
   'feed.adLabel': 'Ad',
@@ -70,7 +70,7 @@ const en = {
   'cart.guestHint': 'Sign in to place your order — your bag is saved.',
 
   // Login
-  'login.welcome': 'Welcome to Souk',
+  'login.welcome': 'Welcome to Levant',
   'login.enterCode': 'Enter your code',
   'login.subtitle': 'Enter your email to sign in or create an account.',
   'login.sentCode': 'We sent a 6-digit code to\n',
@@ -318,7 +318,7 @@ const en = {
   'profile.reregister': 'Re-register Device Notifications',
   'profile.enableNotifs': 'Enable Device Notifications',
   'profile.pushFailed': 'Could not register this device.',
-  'profile.sellOnSouk': 'Sell on Souk',
+  'profile.sellOnLevant': 'Sell on Levant',
   'profile.becomeVendor': 'Become a Vendor',
   'profile.becomeVendorHint': 'List your products and reach shoppers across your region.',
   'profile.becomeVendorConfirm': "You'll be taken to set up your store, and your account switches to Vendor mode. Ready?",
@@ -332,7 +332,7 @@ const en = {
 
   // Profile (language section)
   'profile.language': 'Language',
-  'profile.languageHint': 'Choose the language Souk uses on this device.',
+  'profile.languageHint': 'Choose the language Levant uses on this device.',
 }
 
 export type TranslationKey = keyof typeof en
@@ -357,7 +357,7 @@ const ar: Partial<Record<TranslationKey, string>> = {
   'feed.noMatches': 'لا نتائج',
   'feed.nothingYet': 'لا شيء هنا بعد',
   'feed.tryDifferent': 'جرّب بحثًا أو فئة أو منطقة مختلفة.',
-  'feed.newBoutiques': 'بوتيكات جديدة تنضم إلى سوق كل يوم.',
+  'feed.newBoutiques': 'بوتيكات جديدة تنضم إلى ليفانت كل يوم.',
   'feed.clearFilters': 'مسح الفلاتر',
   'feed.sponsored': 'ممول',
   'feed.adLabel': 'إعلان',
@@ -383,7 +383,7 @@ const ar: Partial<Record<TranslationKey, string>> = {
   'cart.signInToCheckout': 'سجّل الدخول لإتمام الشراء',
   'cart.guestHint': 'سجّل الدخول لإتمام طلبك — حقيبتك محفوظة.',
 
-  'login.welcome': 'أهلاً بك في سوق',
+  'login.welcome': 'أهلاً بك في ليفانت',
   'login.enterCode': 'أدخل الرمز',
   'login.subtitle': 'أدخل بريدك الإلكتروني لتسجيل الدخول أو إنشاء حساب.',
   'login.sentCode': 'أرسلنا رمزًا من 6 أرقام إلى\n',
@@ -423,7 +423,7 @@ const ar: Partial<Record<TranslationKey, string>> = {
   'checkout.outOfStock': 'منتج أو أكثر في حقيبتك نفدت كميته. راجع حقيبتك وحاول مجددًا.',
 
   'profile.language': 'اللغة',
-  'profile.languageHint': 'اختر اللغة التي يستخدمها سوق على هذا الجهاز.',
+  'profile.languageHint': 'اختر اللغة التي يستخدمها ليفانت على هذا الجهاز.',
 
   'catalog.tops': 'بلوزات',
   'catalog.bottoms': 'بناطيل',
@@ -625,7 +625,7 @@ const ar: Partial<Record<TranslationKey, string>> = {
   'profile.reregister': 'إعادة تسجيل إشعارات الجهاز',
   'profile.enableNotifs': 'تفعيل إشعارات الجهاز',
   'profile.pushFailed': 'تعذر تسجيل هذا الجهاز.',
-  'profile.sellOnSouk': 'بِع على سوق',
+  'profile.sellOnLevant': 'بِع على ليفانت',
   'profile.becomeVendor': 'كن بائعًا',
   'profile.becomeVendorHint': 'اعرض منتجاتك وصِل إلى متسوقين في منطقتك.',
   'profile.becomeVendorConfirm': 'ستنتقل لإعداد متجرك، وسيتحول حسابك إلى وضع البائع. جاهز؟',
@@ -658,7 +658,7 @@ const fr: Partial<Record<TranslationKey, string>> = {
   'feed.noMatches': 'Aucun résultat',
   'feed.nothingYet': 'Rien ici pour le moment',
   'feed.tryDifferent': 'Essayez une autre recherche, catégorie ou région.',
-  'feed.newBoutiques': 'De nouvelles boutiques rejoignent Souk chaque jour.',
+  'feed.newBoutiques': 'De nouvelles boutiques rejoignent Levant chaque jour.',
   'feed.clearFilters': 'Effacer les filtres',
   'feed.sponsored': 'Sponsorisé',
   'feed.adLabel': 'Pub',
@@ -684,7 +684,7 @@ const fr: Partial<Record<TranslationKey, string>> = {
   'cart.signInToCheckout': 'Connectez-vous pour commander',
   'cart.guestHint': 'Connectez-vous pour commander — votre panier est sauvegardé.',
 
-  'login.welcome': 'Bienvenue sur Souk',
+  'login.welcome': 'Bienvenue sur Levant',
   'login.enterCode': 'Saisissez votre code',
   'login.subtitle': 'Entrez votre e-mail pour vous connecter ou créer un compte.',
   'login.sentCode': 'Nous avons envoyé un code à 6 chiffres à\n',
@@ -724,7 +724,7 @@ const fr: Partial<Record<TranslationKey, string>> = {
   'checkout.outOfStock': 'Un ou plusieurs articles de votre panier sont en rupture. Vérifiez votre panier et réessayez.',
 
   'profile.language': 'Langue',
-  'profile.languageHint': 'Choisissez la langue utilisée par Souk sur cet appareil.',
+  'profile.languageHint': 'Choisissez la langue utilisée par Levant sur cet appareil.',
 
   'catalog.tops': 'Hauts',
   'catalog.bottoms': 'Bas',
@@ -926,7 +926,7 @@ const fr: Partial<Record<TranslationKey, string>> = {
   'profile.reregister': "Réenregistrer les notifications",
   'profile.enableNotifs': "Activer les notifications",
   'profile.pushFailed': "Impossible d'enregistrer cet appareil.",
-  'profile.sellOnSouk': 'Vendre sur Souk',
+  'profile.sellOnLevant': 'Vendre sur Levant',
   'profile.becomeVendor': 'Devenir vendeur',
   'profile.becomeVendorHint': 'Publiez vos produits et touchez les acheteurs de votre région.',
   'profile.becomeVendorConfirm': 'Vous allez configurer votre boutique et votre compte passera en mode Vendeur. Prêt ?',

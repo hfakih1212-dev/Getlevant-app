@@ -487,7 +487,7 @@ export default function MarketplaceFeedScreen({ navigation }: Props) {
       {/* ── Header ── */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.brandName}>Souk</Text>
+          <Text style={styles.brandName}>Levant</Text>
           <Text style={styles.brandSub}>{t('feed.tagline')}</Text>
         </View>
         <View style={styles.headerActions}>

@@ -1,6 +1,6 @@
-# Souk Supabase Architect Agent Guide
+# Levant Supabase Architect Agent Guide
 
-Purpose: Canonical guide for Souk backend conventions, RLS, migrations, and Edge Functions.
+Purpose: Canonical guide for Levant backend conventions, RLS, migrations, and Edge Functions.
 
 Tech Stack & Rules
 - Database: Supabase PostgreSQL

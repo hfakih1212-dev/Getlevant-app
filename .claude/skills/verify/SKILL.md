@@ -1,9 +1,9 @@
 ---
 name: verify
-description: Build, launch, and drive Souk (Expo web) to verify changes end-to-end with Playwright.
+description: Build, launch, and drive Levant (Expo web) to verify changes end-to-end with Playwright.
 ---
 
-# Verifying Souk changes
+# Verifying Levant changes
 
 ## Launch
 

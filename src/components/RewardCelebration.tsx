@@ -59,7 +59,7 @@ export default function RewardCelebration() {
           <Text style={styles.emoji}>🎉</Text>
           <Text style={styles.title}>Milestone unlocked!</Text>
           <Text style={styles.body}>
-            You've completed {current.milestone} orders on Souk. Here's a{' '}
+            You've completed {current.milestone} orders on Levant. Here's a{' '}
             <Text style={styles.bodyAccent}>{current.discount_pct}% discount</Text> to say thank
             you.
           </Text>

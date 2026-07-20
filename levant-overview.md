@@ -1,15 +1,15 @@
-# Souk — Project Briefing
+# Levant — Project Briefing
 
-*Written 2026-07-14 for handing context to another Claude session (e.g. Claude Desktop). Paste this whole file into the chat to bring it up to speed.*
+*Written 2026-07-14 for handing context to another Claude session (e.g. Claude Desktop). Paste this whole file into the chat to bring it up to speed. Renamed from "Souk" to "Levant" on 2026-07-20 — see "Rename status" below for what's still catching up.*
 
 ## What it is
 
-Souk is a mobile-first marketplace connecting shoppers with local Lebanese boutiques — new and thrifted fashion. Shoppers browse a feed, order, and track delivery; vendors run their store, catalog, and courier dispatch from the same app. Payments settle off-platform (WhatsApp, cash on delivery, bank transfer) — deliberate for the Lebanon market, so no card-processing dependency blocks launch. Free to enter; monetization is programmatic ads + paid vendor "Promoted" placements (see below).
+Levant is a mobile-first marketplace connecting shoppers with local Lebanese boutiques — new and thrifted fashion. Shoppers browse a feed, order, and track delivery; vendors run their store, catalog, and courier dispatch from the same app. Payments settle off-platform (WhatsApp, cash on delivery, bank transfer) — deliberate for the Lebanon market, so no card-processing dependency blocks launch. Free to enter; monetization is programmatic ads + paid vendor "Promoted" placements (see below).
 
 ## Repo & environment
 
-- Local path: `C:\Projects\Souk-app` (Windows)
-- GitHub: `https://github.com/hfakih1212-dev/Souk-app` (branch `main`)
+- Local path: `C:\Projects\Levant-app` (Windows) — renamed from `Souk-app` on 2026-07-20
+- GitHub: `https://github.com/hfakih1212-dev/Souk-app` (branch `main`) — ⚠️ repo itself not yet renamed on GitHub; update this line and the local git remote if/when it is
 - Full project instructions live in `CLAUDE.md` at the repo root — read that first if you have file access; this doc is the no-file-access summary.
 
 ## Tech stack
@@ -27,11 +27,23 @@ Souk is a mobile-first marketplace connecting shoppers with local Lebanese bouti
 
 ## Key IDs & URLs
 
-- Supabase project ref: `fhsnjdwciwzpkzwvcbrl` (`https://fhsnjdwciwzpkzwvcbrl.supabase.co`)
-- EAS project ID: `e8d64369-afb7-434a-8897-69ab61d29e37` (`@faks1231/souk-app`)
-- **Production web app: https://souk-app.expo.app** — always reflects the latest shipped code, open on any phone/desktop browser, no install needed
-- Native bundle ID: `com.souklb.app` (both platforms) — changed from `com.anonymous.soukapp` on 2026-07-05; any dev build installed before that date is a different, orphaned app
+- Supabase project ref: `fhsnjdwciwzpkzwvcbrl` (`https://fhsnjdwciwzpkzwvcbrl.supabase.co`) — dashboard name still `Souk-Backend`; no CLI rename support, needs a manual dashboard rename
+- EAS project ID: `e8d64369-afb7-434a-8897-69ab61d29e37` (`@faks1231/souk-app`) — slug stays `souk-app` deliberately; EAS ties a project to its ID and has no slug-rename command, so app.json's `slug` was reverted to match after a mismatch broke every `eas` command
+- **Production web app: https://souk-app.expo.app** — still the real, live domain (tied to the slug above) and now serving the Levant-branded build as of a 2026-07-20 prod deploy. Do not point code at `levant-app.expo.app` — that domain doesn't exist
+- Native bundle ID in code: `com.levant.app` (both platforms) — changed from `com.souklb.app` on 2026-07-20; any dev/prod build installed before that date is a different, orphaned app (same situation as the `com.anonymous.soukapp` → `com.souklb.app` switch on 2026-07-05). A fresh dev build was triggered same day (EAS build `6306b897-ae7c-4df8-b9f6-443102bcf69a`)
 - Anon key lives in `.env` as `EXPO_PUBLIC_SUPABASE_ANON_KEY` — never the service role key client-side
+
+## Rename status (2026-07-20)
+
+Code, docs, and local config say "Levant" everywhere except applied history (SQL
+migrations, past build hashes/APK names, the `SOUK-` referral code prefix already in the
+DB). Outside-the-repo pieces, after attempting all of them — see `CLAUDE.md` → "Rename
+follow-ups" for full detail:
+- ✅ Web prod deploy done — `souk-app.expo.app` now serves the Levant build
+- ✅ Fresh dev build triggered under `com.levant.app` (build `6306b897…`)
+- ⛔ EAS project slug NOT renamed — can't be via CLI without forking to a new project and losing build/update history; staying `souk-app`
+- ⛔ GitHub repo NOT renamed — `gh repo rename` failed, the PAT lacks Administration:write on the repo
+- ⛔ Supabase project NOT renamed — no CLI support, dashboard-only, blocked from scripting via a direct API call
 
 ## Feature set (what's live today)
 
@@ -86,7 +98,7 @@ Souk is a mobile-first marketplace connecting shoppers with local Lebanese bouti
 ## Known gaps / what's next
 
 - WhatsApp notifications deployed but `WHATSAPP_API_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` secrets not set
-- Push notifications need a device install of the current dev build (bundle ID `com.souklb.app`)
+- Push notifications need a device install of a fresh dev build (bundle ID now `com.levant.app`; the previous `com.souklb.app` build is orphaned)
 - i18n covers the shopper funnel (feed, product, cart, login, checkout) only; vendor screens, RTL layout (I18nManager), and remaining copy are follow-ups
 - No payment/entitlement flow yet for vendors to actually buy a "Promoted" placement — activation is admin-only via direct SQL today
 - No real ad network wired into the in-feed ad slots (placeholder only)
@@ -94,4 +106,4 @@ Souk is a mobile-first marketplace connecting shoppers with local Lebanese bouti
 
 ## How to check it right now
 
-Open **https://souk-app.expo.app** on any phone or desktop browser — it's always current. For native-only features (push notifications, real device install), a fresh EAS dev build under `com.souklb.app` is required; ask whoever is running Claude Code to trigger one via `eas build --profile development --platform android`.
+Open **https://souk-app.expo.app** on any phone or desktop browser — it's current and serving the Levant-branded build (deployed 2026-07-20). For native-only features (push notifications, real device install), a fresh EAS dev build under `com.levant.app` was triggered 2026-07-20 (build `6306b897-ae7c-4df8-b9f6-443102bcf69a`) — check https://expo.dev/accounts/faks1231/projects/souk-app/builds for status and install it.

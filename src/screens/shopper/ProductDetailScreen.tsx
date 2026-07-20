@@ -238,8 +238,8 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
     if (!product) return
     const price = `$${Number(product.price_usd).toFixed(0)}`
     const message = store
-      ? `${product.name} — ${price} at ${store.name} on Souk`
-      : `${product.name} — ${price} on Souk`
+      ? `${product.name} — ${price} at ${store.name} on Levant`
+      : `${product.name} — ${price} on Levant`
     const outcome = await shareLink(message, productLink(product.id))
     if (outcome === 'copied') {
       setLinkCopied(true)

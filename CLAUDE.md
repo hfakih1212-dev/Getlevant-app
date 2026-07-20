@@ -1,7 +1,7 @@
-# Souk App — Claude Instructions
+# Levant App — Claude Instructions
 
 ## Project Overview
-Souk is a mobile-first marketplace app connecting shoppers with local vendors. Built with React Native (Expo SDK 56) + Supabase. Two user roles: **shopper** (browse, cart, checkout, track orders) and **vendor** (manage store, products, orders, courier dispatch).
+Levant is a mobile-first marketplace app connecting shoppers with local vendors. Built with React Native (Expo SDK 56) + Supabase. Two user roles: **shopper** (browse, cart, checkout, track orders) and **vendor** (manage store, products, orders, courier dispatch).
 
 ## Tech Stack
 - **Frontend**: React Native + Expo SDK 56, TypeScript strict mode, React Navigation v7
@@ -9,7 +9,7 @@ Souk is a mobile-first marketplace app connecting shoppers with local vendors. B
 - **Backend**: Supabase (PostgreSQL, Auth, RLS, Storage, Realtime, Edge Functions)
 - **Auth**: Email OTP via Resend (Send Email Hook → `send-otp-email` Edge Function)
 - **Notifications**: WhatsApp Cloud API via `whatsapp-notify` Edge Function
-- **Builds**: EAS (Expo Application Services) — project `@faks1231/souk-app`
+- **Builds**: EAS (Expo Application Services) — project `@faks1231/souk-app` (⚠️ still registered under the old name on expo.dev; app.json now targets slug `levant-app` — see "Rename follow-ups" below)
 
 ## Key Credentials & IDs
 - Supabase project ref: `fhsnjdwciwzpkzwvcbrl`
@@ -113,7 +113,10 @@ npx supabase secrets set KEY=value --project-ref fhsnjdwciwzpkzwvcbrl
 - Always include `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` in commits
 
 ## Web Deployment
-- Production web app: **https://souk-app.expo.app** (EAS Hosting)
+- Production web app: **https://souk-app.expo.app** (EAS Hosting) — ⚠️ still live at the old
+  domain; code now points share links/deep-link prefixes at `https://levant-app.expo.app`,
+  which won't resolve until a prod deploy runs under the renamed EAS project (see "Rename
+  follow-ups" below)
 - Deploy: `npx expo export --platform web && npx eas-cli deploy --prod --non-interactive`
 - Share links (`src/lib/share.ts` WEB_BASE_URL) and deep-link prefixes point at this domain
 
@@ -142,9 +145,54 @@ npx supabase secrets set KEY=value --project-ref fhsnjdwciwzpkzwvcbrl
   I18nManager and applies on next app launch) but no visual QA pass has been done
   in Arabic yet — layouts may need per-screen fixes
 - Push notifications: dev-build APK under `com.souklb.app` built 2026-07-17
-  (EAS build da0b938b) — needs a device install + end-to-end push test
+  (EAS build da0b938b) — orphaned now that the bundle ID is `com.levant.app`. A fresh dev
+  build was triggered 2026-07-20 (build `6306b897-ae7c-4df8-b9f6-443102bcf69a`, new Android
+  keystore auto-created for the new package name) — check
+  https://expo.dev/accounts/faks1231/projects/souk-app/builds/6306b897-ae7c-4df8-b9f6-443102bcf69a
+  for status, then reinstall on device before retesting push
 - Store screenshots not captured yet (copy is done — see `store-listing/listing-copy.md`)
 - Referral payoff mints vouchers on first *delivered* order (milestone 0 = referral reward)
+
+## Rename follow-ups (Souk → Levant, 2026-07-20)
+Code, docs, and config in this repo now say "Levant" everywhere except historical/applied
+records (SQL migrations, past build hashes). Status of the infra pieces that live outside
+this repo, after attempting all of them on 2026-07-20:
+
+- **EAS project slug**: staying `souk-app` (`app.json` → `slug`) **on purpose** — EAS CLI
+  has no rename command and ties a project to its `extra.eas.projectId`, so a mismatched
+  slug hard-fails every `eas` command (`project:info`, `build`, `deploy`). `name` stays
+  `"Levant"` for in-app/store branding; `slug` stays `"souk-app"` so builds/deploys keep
+  working against the existing project (`@faks1231/souk-app`,
+  `e8d64369-afb7-434a-8897-69ab61d29e37`). A true slug rename would require the expo.dev
+  dashboard (unconfirmed whether it's even supported there) or `eas project:init` to
+  register a brand-new project — which would fragment build/OTA-update history from the
+  existing one. Don't change `slug` again without deciding that tradeoff deliberately.
+- **EAS Hosting**: because the slug stayed `souk-app`, production is still served at
+  `souk-app.expo.app` — this is real, not stale. A prod deploy ran 2026-07-20 so that URL
+  now serves the Levant-branded build. `src/lib/share.ts` (`WEB_BASE_URL`) and
+  `RootNavigator.tsx` deep-link prefixes correctly point here — don't "fix" them to
+  `levant-app.expo.app`, that domain doesn't exist.
+- **Bundle ID**: `com.souklb.app` → `com.levant.app` in `app.json`, live. Orphans every
+  previously installed dev/prod build (same situation as the `com.anonymous.soukapp` →
+  `com.souklb.app` switch on 2026-07-05). A fresh dev build was triggered — see the Pending
+  section above for the build ID. If either store listing was already submitted under the
+  old bundle ID, this bundle ID change means a **new** app listing, not an update.
+- **Supabase project**: dashboard name is still `Souk-Backend` (ref `fhsnjdwciwzpkzwvcbrl`).
+  No CLI subcommand renames a project (`supabase projects` only has
+  `list/create/api-keys/delete`), and a direct Management API `PATCH` call was blocked by
+  the local auto-mode permission classifier. Needs a manual rename via the Supabase
+  dashboard (Settings → General).
+- **GitHub repo**: rename attempt failed — `gh repo rename Levant-app` returned
+  `HTTP 403: Resource not accessible by personal access token`. The fine-grained PAT gh is
+  using (same one in `.mcp.json`) lacks "Administration: write" on the repo. Still named
+  `hfakih1212-dev/Souk-app`; local git remote left untouched to match. To finish this:
+  regenerate the PAT with Administration write access (or rename manually on github.com),
+  then re-run `gh repo rename Levant-app` and `git remote set-url origin
+  https://github.com/hfakih1212-dev/Levant-app.git`.
+- **SQL migrations**: left untouched on purpose (`init_souk.sql`, `SOUK-` referral code
+  prefix in `loyalty_rewards.sql`/`growth_features.sql`, etc.) — these are applied history;
+  renaming the referral code prefix going forward would need a new migration, not an edit
+  to old ones.
 
 ## Recently shipped (2026-07-17)
 - Promotion purchase-request flow: `promotion_requests` table (RLS: vendor

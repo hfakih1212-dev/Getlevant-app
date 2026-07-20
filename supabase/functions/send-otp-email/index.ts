@@ -45,14 +45,14 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Souk <onboarding@resend.dev>'
+  const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Levant <onboarding@resend.dev>'
 
   const html = `
 <!DOCTYPE html>
 <html>
 <body style="font-family:sans-serif;background:#FAF7F2;margin:0;padding:40px 20px">
   <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:12px;padding:40px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-    <h1 style="color:#1C1612;font-size:24px;margin:0 0 8px">Your Souk sign-in code</h1>
+    <h1 style="color:#1C1612;font-size:24px;margin:0 0 8px">Your Levant sign-in code</h1>
     <p style="color:#7A6A5A;margin:0 0 32px">Enter this code in the app to sign in.</p>
     <div style="background:#FAF7F2;border-radius:12px;padding:24px;text-align:center;margin-bottom:32px">
       <span style="font-size:48px;font-weight:700;letter-spacing:16px;color:#1C1612;font-family:monospace">${otp}</span>
@@ -72,7 +72,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         from: FROM_EMAIL,
         to: [user.email],
-        subject: `${otp} is your Souk sign-in code`,
+        subject: `${otp} is your Levant sign-in code`,
         html,
       }),
     })

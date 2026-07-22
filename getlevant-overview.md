@@ -1,15 +1,15 @@
-# Levant — Project Briefing
+# Getlevant — Project Briefing
 
-*Written 2026-07-14 for handing context to another Claude session (e.g. Claude Desktop). Paste this whole file into the chat to bring it up to speed. Renamed from "Souk" to "Levant" on 2026-07-20 — see "Rename status" below for what's still catching up.*
+*Written 2026-07-14 for handing context to another Claude session (e.g. Claude Desktop). Paste this whole file into the chat to bring it up to speed. Renamed from "Souk" to "Levant" on 2026-07-20, then superseded by "Getlevant" on 2026-07-22 — see "Rename status" below for what's still catching up.*
 
 ## What it is
 
-Levant is a mobile-first marketplace connecting shoppers with local Lebanese boutiques — new and thrifted fashion. Shoppers browse a feed, order, and track delivery; vendors run their store, catalog, and courier dispatch from the same app. Payments settle off-platform (WhatsApp, cash on delivery, bank transfer) — deliberate for the Lebanon market, so no card-processing dependency blocks launch. Free to enter; monetization is programmatic ads + paid vendor "Promoted" placements (see below).
+Getlevant is a mobile-first marketplace connecting shoppers with local Lebanese boutiques — new and thrifted fashion. Shoppers browse a feed, order, and track delivery; vendors run their store, catalog, and courier dispatch from the same app. Payments settle off-platform (WhatsApp, cash on delivery, bank transfer) — deliberate for the Lebanon market, so no card-processing dependency blocks launch. Free to enter; monetization is programmatic ads + paid vendor "Promoted" placements (see below).
 
 ## Repo & environment
 
-- Local path: `C:\Projects\Levant-app` (Windows) — renamed from `Souk-app` on 2026-07-20
-- GitHub: `https://github.com/hfakih1212-dev/Souk-app` (branch `main`) — ⚠️ repo itself not yet renamed on GitHub; update this line and the local git remote if/when it is
+- Local path: `C:\Projects\Levant-app` (Windows) — renamed from `Souk-app` on 2026-07-20; not yet renamed again to match "Getlevant" (folder rename deferred to the end of the 2026-07-22 pass)
+- GitHub: `https://github.com/hfakih1212-dev/Souk-app` (branch `main`) — ⚠️ repo itself not yet renamed on GitHub (attempted both 2026-07-20 and 2026-07-22, same PAT-permission failure both times); update this line and the local git remote if/when it is
 - Full project instructions live in `CLAUDE.md` at the repo root — read that first if you have file access; this doc is the no-file-access summary.
 
 ## Tech stack
@@ -28,22 +28,25 @@ Levant is a mobile-first marketplace connecting shoppers with local Lebanese bou
 ## Key IDs & URLs
 
 - Supabase project ref: `fhsnjdwciwzpkzwvcbrl` (`https://fhsnjdwciwzpkzwvcbrl.supabase.co`) — dashboard name still `Souk-Backend`; no CLI rename support, needs a manual dashboard rename
-- EAS project ID: `e8d64369-afb7-434a-8897-69ab61d29e37` (`@faks1231/souk-app`) — slug stays `souk-app` deliberately; EAS ties a project to its ID and has no slug-rename command, so app.json's `slug` was reverted to match after a mismatch broke every `eas` command
-- **Production web app: https://souk-app.expo.app** — still the real, live domain (tied to the slug above) and now serving the Levant-branded build as of a 2026-07-20 prod deploy. Do not point code at `levant-app.expo.app` — that domain doesn't exist
-- Native bundle ID in code: `com.levant.app` (both platforms) — changed from `com.souklb.app` on 2026-07-20; any dev/prod build installed before that date is a different, orphaned app (same situation as the `com.anonymous.soukapp` → `com.souklb.app` switch on 2026-07-05). A fresh dev build was triggered same day (EAS build `6306b897-ae7c-4df8-b9f6-443102bcf69a`)
+- EAS project ID: `b8eddc64-66b8-40ba-b2e5-57c659fa0bbf` (`@faks1231/getlevant`) — a **brand-new** EAS project created 2026-07-22 (`eas init --force`) to get the `getlevant` slug; the previous project `@faks1231/souk-app` (`e8d64369-afb7-434a-8897-69ab61d29e37`) still exists with its full build/OTA history but is no longer linked
+- **Production web app: https://getlevant.expo.app** — live as of the 2026-07-22 prod deploy under the new EAS project. The old `souk-app.expo.app` still resolves (serving the 2026-07-20 Levant build) but nothing in this repo points at it anymore
+- Native bundle ID in code: `com.getlevant.app` (both platforms) — changed from `com.levant.app` on 2026-07-22; any dev/prod build installed before that date is a different, orphaned app (same lineage as `com.anonymous.soukapp` → `com.souklb.app` → `com.levant.app` → `com.getlevant.app`). A fresh dev build was triggered same day (EAS build `fa18ec1b-005b-4f74-9ea5-b58c7152e531`)
 - Anon key lives in `.env` as `EXPO_PUBLIC_SUPABASE_ANON_KEY` — never the service role key client-side
 
-## Rename status (2026-07-20)
+## Rename status (2026-07-22, second rename)
 
-Code, docs, and local config say "Levant" everywhere except applied history (SQL
+Code, docs, and local config say "Getlevant" everywhere except applied history (SQL
 migrations, past build hashes/APK names, the `SOUK-` referral code prefix already in the
-DB). Outside-the-repo pieces, after attempting all of them — see `CLAUDE.md` → "Rename
+DB, the seed store name "Levant Threads" which is unrelated demo-data business naming).
+Outside-the-repo pieces, after attempting all of them — see `CLAUDE.md` → "Rename
 follow-ups" for full detail:
-- ✅ Web prod deploy done — `souk-app.expo.app` now serves the Levant build
-- ✅ Fresh dev build triggered under `com.levant.app` (build `6306b897…`)
-- ⛔ EAS project slug NOT renamed — can't be via CLI without forking to a new project and losing build/update history; staying `souk-app`
-- ⛔ GitHub repo NOT renamed — `gh repo rename` failed, the PAT lacks Administration:write on the repo
-- ⛔ Supabase project NOT renamed — no CLI support, dashboard-only, blocked from scripting via a direct API call
+- ✅ EAS fork accepted this time (unlike the Levant rename, which deliberately avoided it) — new project `@faks1231/getlevant`
+- ✅ Web prod deploy done — `getlevant.expo.app` now serves the Getlevant build
+- ✅ Fresh dev build triggered under `com.getlevant.app` (build `fa18ec1b…`)
+- ⛔ GitHub repo NOT renamed — `gh repo rename` failed again, same PAT permission gap as 2026-07-20
+- ⛔ Supabase project NOT renamed — no CLI support, dashboard-only
+- ⛔ Supabase Auth redirect-URL allowlist NOT synced to remote — `config.toml` has the new `getlevant://` scheme locally, but `supabase config push` was blocked by the permission classifier
+- ⛔ Two pending DB migrations still not pushed (unrelated to the rename — a promotion-request table and a stock-decrement RLS fix from 2026-07-20/21) — also blocked by the classifier
 
 ## Feature set (what's live today)
 
@@ -61,7 +64,7 @@ follow-ups" for full detail:
 **Vendor**
 - Store onboarding + self-serve "Start Selling" upgrade from Profile
 - Dashboard with order pipeline (placed → confirmed → preparing → ready → dispatched → delivered)
-- Product management: create/edit products with variants, stock, up to 4 photos (add/remove) in Supabase Storage
+- Product management: create/edit products with variants, stock, up to 4 photos (add/remove) in Supabase Storage; delete a product (hard-delete, or unlist if it has order history)
 - Store settings incl. logo upload
 - Shipment/courier dispatch per order
 - Read-only "Promoted" indicator on their own listings (see Monetization)
@@ -81,7 +84,7 @@ follow-ups" for full detail:
 
 ## Data model (key tables)
 
-`users` (mirrors auth.users; role, notification prefs, push_token, loyalty counters, referral_code, referred_by) · `stores` (owner, region, whatsapp, logo_url, rating) · `products` (+ `is_promoted`/`promotion_expires_at`) / `product_variants` / `product_images` · `orders` (+ `voucher_code`/`discount_usd`) / `order_items` (snapshotted prices) · `shipments` / `shipment_events` · `reviews` (one per delivered order) · `favorites` · `rewards` (loyalty/referral vouchers)
+`users` (mirrors auth.users; role, notification prefs, push_token, loyalty counters, referral_code, referred_by) · `stores` (owner, region, whatsapp, logo_url, rating) · `products` (+ `is_promoted`/`promotion_expires_at`) / `product_variants` / `product_images` · `orders` (+ `voucher_code`/`discount_usd`) / `order_items` (snapshotted prices) · `shipments` / `shipment_events` · `reviews` (one per delivered order) · `favorites` · `rewards` (loyalty/referral vouchers) · `promotion_requests` (vendor-filed, admin-approved — migration written, not yet pushed)
 
 ## Conventions this project follows
 
@@ -98,12 +101,13 @@ follow-ups" for full detail:
 ## Known gaps / what's next
 
 - WhatsApp notifications deployed but `WHATSAPP_API_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` secrets not set
-- Push notifications need a device install of a fresh dev build (bundle ID now `com.levant.app`; the previous `com.souklb.app` build is orphaned)
+- Push notifications need a device install of a fresh dev build (bundle ID now `com.getlevant.app`; the previous `com.levant.app` build is orphaned)
 - i18n covers the shopper funnel (feed, product, cart, login, checkout) only; vendor screens, RTL layout (I18nManager), and remaining copy are follow-ups
 - No payment/entitlement flow yet for vendors to actually buy a "Promoted" placement — activation is admin-only via direct SQL today
 - No real ad network wired into the in-feed ad slots (placeholder only)
-- Store-listing assets (screenshots, app store copy) not produced
+- Store-listing assets (screenshots, app store copy) not produced — copy is done and updated for Getlevant, screenshots still pending
+- Two DB migrations and one Supabase config sync still need a human to push (see "Rename status" above)
 
 ## How to check it right now
 
-Open **https://souk-app.expo.app** on any phone or desktop browser — it's current and serving the Levant-branded build (deployed 2026-07-20). For native-only features (push notifications, real device install), a fresh EAS dev build under `com.levant.app` was triggered 2026-07-20 (build `6306b897-ae7c-4df8-b9f6-443102bcf69a`) — check https://expo.dev/accounts/faks1231/projects/souk-app/builds for status and install it.
+Open **https://getlevant.expo.app** on any phone or desktop browser — it's current and serving the Getlevant-branded build (deployed 2026-07-22). For native-only features (push notifications, real device install), a fresh EAS dev build under `com.getlevant.app` was triggered 2026-07-22 (build `fa18ec1b-005b-4f74-9ea5-b58c7152e531`) — check https://expo.dev/accounts/faks1231/projects/getlevant/builds for status and install it.

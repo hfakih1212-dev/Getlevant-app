@@ -345,6 +345,13 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
   const [promoSubmitting, setPromoSubmitting] = useState(false)
   const [promoError,      setPromoError]      = useState<string | null>(null)
 
+  // Delete product (edit mode) — two-tap confirm, same pattern as
+  // VendorDashboard's cancel-order
+  const [deleteConfirming,  setDeleteConfirming]  = useState(false)
+  const [deleteSubmitting,  setDeleteSubmitting]  = useState(false)
+  const [deleteError,       setDeleteError]       = useState<string | null>(null)
+  const [deleteArchived,    setDeleteArchived]    = useState(false)
+
   // ---- Data loading ----
 
   const load = useCallback(async () => {
@@ -405,6 +412,10 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
     setPromoDuration(7)
     setPromoSubmitting(false)
     setPromoError(null)
+    setDeleteConfirming(false)
+    setDeleteSubmitting(false)
+    setDeleteError(null)
+    setDeleteArchived(false)
   }, [])
 
   const handlePickImage = useCallback(async () => {
@@ -520,6 +531,65 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
     }
     setPromoSubmitting(false)
   }, [editingId, storeId, user?.id, promoDuration])
+
+  const handleDeleteProduct = useCallback(async () => {
+    if (!editingId) return
+    if (!deleteConfirming) {
+      setDeleteConfirming(true)
+      return
+    }
+    setDeleteConfirming(false)
+    setDeleteSubmitting(true)
+    setDeleteError(null)
+
+    const { error: deleteErr } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', editingId)
+
+    if (deleteErr) {
+      // order_items.product_id has no cascade — a product with order history
+      // can't be hard-deleted without breaking those orders. Unlist it
+      // instead so it drops out of the public feed; the vendor still sees
+      // the row (now "Inactive") since owns_store bypasses the active-only
+      // public select policy.
+      if (deleteErr.code === '23503') {
+        const { error: archiveErr } = await supabase
+          .from('products')
+          .update({ status: 'inactive' })
+          .eq('id', editingId)
+
+        if (archiveErr) {
+          setDeleteError(t('inventory.deleteProductFailed'))
+          setDeleteSubmitting(false)
+          return
+        }
+
+        setDeleteArchived(true)
+        setDeleteSubmitting(false)
+        return
+      }
+
+      setDeleteError(t('inventory.deleteProductFailed'))
+      setDeleteSubmitting(false)
+      return
+    }
+
+    // Hard delete succeeded — product_variants/product_images/promotion_requests
+    // rows are gone via ON DELETE CASCADE; clean up the now-orphaned storage
+    // objects (best-effort, doesn't block returning to the list).
+    const paths = existingImages
+      .map(img => storagePathFromUrl(img.url))
+      .filter((p): p is string => p !== null)
+    if (paths.length > 0) {
+      await supabase.storage.from('product-images').remove(paths)
+    }
+
+    await load()
+    setMode('list')
+    resetForm()
+    setDeleteSubmitting(false)
+  }, [editingId, deleteConfirming, existingImages, load, resetForm, t])
 
   // Deep-link support: ProductManagement can be opened with { productId } to
   // jump straight into edit mode. Consume the param so re-focus doesn't loop.
@@ -1023,6 +1093,41 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
 
                     {promoError ? (
                       <Text style={styles.formError}>{promoError}</Text>
+                    ) : null}
+                  </>
+                )}
+              </View>
+            )}
+
+            {/* ── Delete product (edit mode only) ── */}
+            {isEdit && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>{t('inventory.deleteProduct')}</Text>
+
+                {deleteArchived ? (
+                  <View style={styles.promoPendingBox}>
+                    <Text style={styles.promoBoxBody}>{t('inventory.deleteProductArchivedNotice')}</Text>
+                  </View>
+                ) : (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.deleteBtn, deleteConfirming && styles.deleteBtnConfirming]}
+                      onPress={handleDeleteProduct}
+                      disabled={deleteSubmitting}
+                      activeOpacity={0.85}
+                    >
+                      {deleteSubmitting
+                        ? <ActivityIndicator color="#D9552B" />
+                        : (
+                          <Text style={[styles.deleteBtnText, deleteConfirming && styles.deleteBtnTextConfirming]}>
+                            {deleteConfirming ? t('inventory.deleteProductConfirm') : t('inventory.deleteProduct')}
+                          </Text>
+                        )
+                      }
+                    </TouchableOpacity>
+
+                    {deleteError ? (
+                      <Text style={styles.formError}>{deleteError}</Text>
                     ) : null}
                   </>
                 )}
@@ -1589,6 +1694,26 @@ const styles = StyleSheet.create({
   promoRequestBtnText: {
     fontSize: 14,
     fontWeight: '700',
+    color: '#D9552B',
+  },
+  deleteBtn: {
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#D9CFC4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#7A6A5A',
+  },
+  deleteBtnConfirming: {
+    borderColor: '#D9552B',
+    backgroundColor: '#FFF3EC',
+  },
+  deleteBtnTextConfirming: {
     color: '#D9552B',
   },
   // Inline form error

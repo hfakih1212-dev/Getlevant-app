@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "Levant",
-    "slug": "souk-app",
-    "scheme": "levant",
+    "name": "Getlevant",
+    "slug": "getlevant",
+    "scheme": "getlevant",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.levant.app",
+      "bundleIdentifier": "com.getlevant.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -22,7 +22,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.levant.app"
+      "package": "com.getlevant.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,9 +33,10 @@
       "expo-notifications",
       "expo-localization"
     ],
+    "owner": "faks1231",
     "extra": {
       "eas": {
-        "projectId": "e8d64369-afb7-434a-8897-69ab61d29e37"
+        "projectId": "b8eddc64-66b8-40ba-b2e5-57c659fa0bbf"
       }
     }
   }

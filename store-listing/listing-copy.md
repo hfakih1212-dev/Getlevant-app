@@ -1,8 +1,8 @@
-# Levant — Store Listing Copy
+# Getlevant — Store Listing Copy
 
 Copy for Google Play Console and App Store Connect submissions. Character
 limits are noted per field; all three launch languages (EN / AR / FR) are
-covered. Bundle ID: `com.levant.app`.
+covered. Bundle ID: `com.getlevant.app`.
 
 ---
 
@@ -10,9 +10,9 @@ covered. Bundle ID: `com.levant.app`.
 
 | Lang | Title |
 |---|---|
-| EN | Levant — Local Boutique Market |
-| AR | ليفانت — بوتيكات لبنان |
-| FR | Levant — Boutiques du Liban |
+| EN | Getlevant — Local Boutiques |
+| AR | Getlevant — بوتيكات لبنان |
+| FR | Getlevant — Boutiques du Liban |
 
 ## App Store subtitle (30 chars)
 
@@ -34,7 +34,7 @@ covered. Bundle ID: `com.levant.app`.
 
 ### EN
 
-**Levant brings Lebanon's boutiques to your pocket.**
+**Getlevant brings Lebanon's boutiques to your pocket.**
 
 Discover new and thrifted fashion from independent local sellers — browse,
 order, and track delivery to your door, all in one app.
@@ -48,7 +48,7 @@ order, and track delivery to your door, all in one app.
 • Earn loyalty tiers and discount vouchers as you shop; refer friends and you both get rewarded
 • Read real reviews from verified buyers
 • Save favourites and share finds with friends
-• Use Levant in English, Arabic, or French
+• Use Getlevant in English, Arabic, or French
 
 **For sellers**
 • Open your store in minutes — no fees to join
@@ -61,11 +61,11 @@ order, and track delivery to your door, all in one app.
 Payments settle directly between you and the seller — the way business is
 actually done in Lebanon. No cards, no friction, no waiting.
 
-Levant is free to join for shoppers and sellers.
+Getlevant is free to join for shoppers and sellers.
 
 ### AR
 
-**ليفانت يضع بوتيكات لبنان في جيبك.**
+**Getlevant يضع بوتيكات لبنان في جيبك.**
 
 اكتشف أزياء جديدة ومستعملة من بائعين محليين مستقلين — تصفّح، اطلب، وتتبّع التوصيل حتى باب بيتك، كل ذلك في تطبيق واحد.
 
@@ -78,7 +78,7 @@ Levant is free to join for shoppers and sellers.
 • اكسب مستويات ولاء وقسائم خصم مع كل طلب؛ أحِل أصدقاءك واربحا معًا
 • اقرأ تقييمات حقيقية من مشترين موثّقين
 • احفظ المفضلة وشارك اكتشافاتك مع أصدقائك
-• استخدم ليفانت بالعربية أو الإنجليزية أو الفرنسية
+• استخدم Getlevant بالعربية أو الإنجليزية أو الفرنسية
 
 **للبائعين**
 • افتح متجرك في دقائق — الانضمام مجاني
@@ -90,11 +90,11 @@ Levant is free to join for shoppers and sellers.
 
 الدفع يتم مباشرة بينك وبين البائع — كما تُدار الأعمال فعلًا في لبنان. بلا بطاقات، بلا تعقيد، بلا انتظار.
 
-الانضمام إلى ليفانت مجاني للمتسوقين والبائعين.
+الانضمام إلى Getlevant مجاني للمتسوقين والبائعين.
 
 ### FR
 
-**Levant met les boutiques du Liban dans votre poche.**
+**Getlevant met les boutiques du Liban dans votre poche.**
 
 Découvrez la mode neuve et seconde main de vendeurs locaux indépendants —
 parcourez, commandez et suivez la livraison jusqu'à votre porte, le tout dans
@@ -109,7 +109,7 @@ une seule app.
 • Gagnez des niveaux de fidélité et des bons de réduction ; parrainez vos amis et soyez récompensés tous les deux
 • Lisez de vrais avis d'acheteurs vérifiés
 • Enregistrez vos favoris et partagez vos trouvailles
-• Utilisez Levant en français, arabe ou anglais
+• Utilisez Getlevant en français, arabe ou anglais
 
 **Pour les vendeurs**
 • Ouvrez votre boutique en quelques minutes — inscription gratuite
@@ -122,12 +122,12 @@ une seule app.
 Les paiements se règlent directement entre vous et le vendeur — comme les
 affaires se font réellement au Liban. Sans carte, sans friction.
 
-Levant est gratuit pour les acheteurs comme pour les vendeurs.
+Getlevant est gratuit pour les acheteurs comme pour les vendeurs.
 
 ## Keywords (App Store, 100 chars, comma-separated, EN)
 
 ```
-boutique,thrift,fashion,lebanon,beirut,marketplace,local,shopping,delivery,vintage,levant
+boutique,thrift,fashion,lebanon,beirut,marketplace,local,shopping,delivery,vintage,getlevant
 ```
 
 ## Category
@@ -143,7 +143,7 @@ boutique,thrift,fashion,lebanon,beirut,marketplace,local,shopping,delivery,vinta
 
 ## Support / marketing URLs
 
-- Web app: https://levant-app.expo.app
+- Web app: https://getlevant.expo.app
 - Support email: hfakih1212@gmail.com (replace with a support@ alias before launch)
 
 ---
@@ -162,7 +162,7 @@ Needed per store (portrait phone, device-framed or clean full-bleed):
 5. Vendor dashboard with analytics strip
 6. Product management / add product
 
-Capture at 1080×1920+ from the production web app (https://levant-app.expo.app
+Capture at 1080×1920+ from the production web app (https://getlevant.expo.app
 in a phone-sized viewport) or an Android emulator running the dev build.
 Play Store also wants a 1024×500 feature graphic; App Store wants 6.7" and
 6.5" sets (can be generated from one 1290×2796 capture set).

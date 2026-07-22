@@ -52,13 +52,13 @@ export type VendorStackParamList = {
 }
 
 // ---------------------------------------------------------------------------
-// Deep links — levant://product/<id> on native, /product/<id> on web.
+// Deep links — getlevant://product/<id> on native, /product/<id> on web.
 // Vendor screens are deliberately unmapped; shared links always target the
 // shopper surface.
 // ---------------------------------------------------------------------------
 
 const linking: LinkingOptions<ShopperStackParamList> = {
-  prefixes: [Linking.createURL('/'), 'https://souk-app.expo.app'],
+  prefixes: [Linking.createURL('/'), 'https://getlevant.expo.app'],
   config: {
     // Deep links mount on top of the feed so back navigation always works —
     // without this a shared product link opens a stack of one stranded screen

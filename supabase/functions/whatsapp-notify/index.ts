@@ -67,7 +67,7 @@ function buildNewOrderMessage(order: Record<string, unknown>): string {
     .join('\n')
 
   return [
-    '🛍 *New Order on Levant!*',
+    '🛍 *New Order on Getlevant!*',
     '',
     `Order: *${order.order_number}*`,
     `Customer: ${contact}`,
@@ -79,7 +79,7 @@ function buildNewOrderMessage(order: Record<string, unknown>): string {
     '',
     order.delivery_address ? `📍 Deliver to:\n${order.delivery_address}` : null,
     '',
-    'Open the Levant app to accept this order.',
+    'Open the Getlevant app to accept this order.',
   ].filter((l) => l !== null).join('\n').trim()
 }
 
@@ -88,20 +88,20 @@ function buildStatusMessage(order: Record<string, unknown>, newStatus: string): 
 
   if (newStatus === 'dispatched') {
     const shipment = first(order.shipments as unknown[]) as Record<string, string | null> | null
-    const lines = [`🚚 Your Levant order *${num}* is on its way!`]
+    const lines = [`🚚 Your Getlevant order *${num}* is on its way!`]
     if (shipment?.courier_name)  lines.push(`Courier: ${shipment.courier_name}`)
     if (shipment?.tracking_id)   lines.push(`Tracking: ${shipment.tracking_id}`)
     if (shipment?.courier_phone) lines.push(`Courier phone: ${shipment.courier_phone}`)
-    lines.push('', 'Track your delivery in the Levant app.')
+    lines.push('', 'Track your delivery in the Getlevant app.')
     return lines.join('\n')
   }
 
   const STATIC: Partial<Record<string, string>> = {
-    confirmed: `✅ Your Levant order *${num}* is confirmed! The vendor is getting it ready.`,
-    preparing: `⏳ Your Levant order *${num}* is being prepared.`,
-    ready:     `📦 Your Levant order *${num}* is packed and ready for the courier.`,
-    delivered: `🎉 Your Levant order *${num}* has been delivered! Enjoy your purchase.`,
-    cancelled: `❌ Your Levant order *${num}* has been cancelled. Questions? Contact the vendor directly.`,
+    confirmed: `✅ Your Getlevant order *${num}* is confirmed! The vendor is getting it ready.`,
+    preparing: `⏳ Your Getlevant order *${num}* is being prepared.`,
+    ready:     `📦 Your Getlevant order *${num}* is packed and ready for the courier.`,
+    delivered: `🎉 Your Getlevant order *${num}* has been delivered! Enjoy your purchase.`,
+    cancelled: `❌ Your Getlevant order *${num}* has been cancelled. Questions? Contact the vendor directly.`,
   }
   return STATIC[newStatus] ?? null
 }

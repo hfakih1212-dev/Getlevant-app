@@ -41,7 +41,7 @@ const en = {
   'feed.noMatches': 'No matches',
   'feed.nothingYet': 'Nothing here yet',
   'feed.tryDifferent': 'Try a different search, category, or region.',
-  'feed.newBoutiques': 'New boutiques are joining Levant every day.',
+  'feed.newBoutiques': 'New boutiques are joining Getlevant every day.',
   'feed.clearFilters': 'Clear filters',
   'feed.sponsored': 'Sponsored',
   'feed.adLabel': 'Ad',
@@ -70,7 +70,7 @@ const en = {
   'cart.guestHint': 'Sign in to place your order — your bag is saved.',
 
   // Login
-  'login.welcome': 'Welcome to Levant',
+  'login.welcome': 'Welcome to Getlevant',
   'login.enterCode': 'Enter your code',
   'login.subtitle': 'Enter your email to sign in or create an account.',
   'login.sentCode': 'We sent a 6-digit code to\n',
@@ -282,6 +282,10 @@ const en = {
   'inventory.promoHint': 'Boost this product to the top of the marketplace feed with a "Sponsored" badge. We\'ll reach out on your store\'s WhatsApp to arrange payment.',
   'inventory.promoDays': '{n} days',
   'inventory.promoRequest': 'Request Promotion',
+  'inventory.deleteProduct': 'Delete Product',
+  'inventory.deleteProductConfirm': 'Tap again to confirm delete',
+  'inventory.deleteProductArchivedNotice': "This product already has orders against it, so it can't be fully deleted — it's been unlisted from the marketplace instead.",
+  'inventory.deleteProductFailed': 'Could not delete this product.',
 
   // Profile
   'profile.title': 'Profile',
@@ -318,7 +322,7 @@ const en = {
   'profile.reregister': 'Re-register Device Notifications',
   'profile.enableNotifs': 'Enable Device Notifications',
   'profile.pushFailed': 'Could not register this device.',
-  'profile.sellOnLevant': 'Sell on Levant',
+  'profile.sellOnLevant': 'Sell on Getlevant',
   'profile.becomeVendor': 'Become a Vendor',
   'profile.becomeVendorHint': 'List your products and reach shoppers across your region.',
   'profile.becomeVendorConfirm': "You'll be taken to set up your store, and your account switches to Vendor mode. Ready?",
@@ -332,7 +336,7 @@ const en = {
 
   // Profile (language section)
   'profile.language': 'Language',
-  'profile.languageHint': 'Choose the language Levant uses on this device.',
+  'profile.languageHint': 'Choose the language Getlevant uses on this device.',
 }
 
 export type TranslationKey = keyof typeof en
@@ -357,7 +361,7 @@ const ar: Partial<Record<TranslationKey, string>> = {
   'feed.noMatches': 'لا نتائج',
   'feed.nothingYet': 'لا شيء هنا بعد',
   'feed.tryDifferent': 'جرّب بحثًا أو فئة أو منطقة مختلفة.',
-  'feed.newBoutiques': 'بوتيكات جديدة تنضم إلى ليفانت كل يوم.',
+  'feed.newBoutiques': 'بوتيكات جديدة تنضم إلى Getlevant كل يوم.',
   'feed.clearFilters': 'مسح الفلاتر',
   'feed.sponsored': 'ممول',
   'feed.adLabel': 'إعلان',
@@ -383,7 +387,7 @@ const ar: Partial<Record<TranslationKey, string>> = {
   'cart.signInToCheckout': 'سجّل الدخول لإتمام الشراء',
   'cart.guestHint': 'سجّل الدخول لإتمام طلبك — حقيبتك محفوظة.',
 
-  'login.welcome': 'أهلاً بك في ليفانت',
+  'login.welcome': 'أهلاً بك في Getlevant',
   'login.enterCode': 'أدخل الرمز',
   'login.subtitle': 'أدخل بريدك الإلكتروني لتسجيل الدخول أو إنشاء حساب.',
   'login.sentCode': 'أرسلنا رمزًا من 6 أرقام إلى\n',
@@ -423,7 +427,7 @@ const ar: Partial<Record<TranslationKey, string>> = {
   'checkout.outOfStock': 'منتج أو أكثر في حقيبتك نفدت كميته. راجع حقيبتك وحاول مجددًا.',
 
   'profile.language': 'اللغة',
-  'profile.languageHint': 'اختر اللغة التي يستخدمها ليفانت على هذا الجهاز.',
+  'profile.languageHint': 'اختر اللغة التي يستخدمها Getlevant على هذا الجهاز.',
 
   'catalog.tops': 'بلوزات',
   'catalog.bottoms': 'بناطيل',
@@ -590,6 +594,10 @@ const ar: Partial<Record<TranslationKey, string>> = {
   'inventory.promoHint': 'ارفع هذا المنتج إلى أعلى السوق مع شارة "ممول". سنتواصل معك عبر واتساب متجرك لترتيب الدفع.',
   'inventory.promoDays': '{n} أيام',
   'inventory.promoRequest': 'طلب ترويج',
+  'inventory.deleteProduct': 'حذف المنتج',
+  'inventory.deleteProductConfirm': 'اضغط مرة أخرى للتأكيد',
+  'inventory.deleteProductArchivedNotice': 'هذا المنتج لديه طلبات مسجلة، لذا لا يمكن حذفه بالكامل — تم إلغاء إدراجه من السوق بدلًا من ذلك.',
+  'inventory.deleteProductFailed': 'تعذر حذف هذا المنتج.',
 
   'profile.title': 'الملف الشخصي',
   'profile.roleVendor': 'بائع',
@@ -625,7 +633,7 @@ const ar: Partial<Record<TranslationKey, string>> = {
   'profile.reregister': 'إعادة تسجيل إشعارات الجهاز',
   'profile.enableNotifs': 'تفعيل إشعارات الجهاز',
   'profile.pushFailed': 'تعذر تسجيل هذا الجهاز.',
-  'profile.sellOnLevant': 'بِع على ليفانت',
+  'profile.sellOnLevant': 'بِع على Getlevant',
   'profile.becomeVendor': 'كن بائعًا',
   'profile.becomeVendorHint': 'اعرض منتجاتك وصِل إلى متسوقين في منطقتك.',
   'profile.becomeVendorConfirm': 'ستنتقل لإعداد متجرك، وسيتحول حسابك إلى وضع البائع. جاهز؟',
@@ -658,7 +666,7 @@ const fr: Partial<Record<TranslationKey, string>> = {
   'feed.noMatches': 'Aucun résultat',
   'feed.nothingYet': 'Rien ici pour le moment',
   'feed.tryDifferent': 'Essayez une autre recherche, catégorie ou région.',
-  'feed.newBoutiques': 'De nouvelles boutiques rejoignent Levant chaque jour.',
+  'feed.newBoutiques': 'De nouvelles boutiques rejoignent Getlevant chaque jour.',
   'feed.clearFilters': 'Effacer les filtres',
   'feed.sponsored': 'Sponsorisé',
   'feed.adLabel': 'Pub',
@@ -684,7 +692,7 @@ const fr: Partial<Record<TranslationKey, string>> = {
   'cart.signInToCheckout': 'Connectez-vous pour commander',
   'cart.guestHint': 'Connectez-vous pour commander — votre panier est sauvegardé.',
 
-  'login.welcome': 'Bienvenue sur Levant',
+  'login.welcome': 'Bienvenue sur Getlevant',
   'login.enterCode': 'Saisissez votre code',
   'login.subtitle': 'Entrez votre e-mail pour vous connecter ou créer un compte.',
   'login.sentCode': 'Nous avons envoyé un code à 6 chiffres à\n',
@@ -724,7 +732,7 @@ const fr: Partial<Record<TranslationKey, string>> = {
   'checkout.outOfStock': 'Un ou plusieurs articles de votre panier sont en rupture. Vérifiez votre panier et réessayez.',
 
   'profile.language': 'Langue',
-  'profile.languageHint': 'Choisissez la langue utilisée par Levant sur cet appareil.',
+  'profile.languageHint': 'Choisissez la langue utilisée par Getlevant sur cet appareil.',
 
   'catalog.tops': 'Hauts',
   'catalog.bottoms': 'Bas',
@@ -891,6 +899,10 @@ const fr: Partial<Record<TranslationKey, string>> = {
   'inventory.promoHint': 'Placez ce produit en tête du fil avec un badge « Sponsorisé ». Nous vous contacterons sur le WhatsApp de votre boutique pour le paiement.',
   'inventory.promoDays': '{n} jours',
   'inventory.promoRequest': 'Demander la promotion',
+  'inventory.deleteProduct': 'Supprimer le produit',
+  'inventory.deleteProductConfirm': 'Appuyez à nouveau pour confirmer',
+  'inventory.deleteProductArchivedNotice': "Ce produit a déjà des commandes ; il n'a pas pu être totalement supprimé — il a été retiré du marché à la place.",
+  'inventory.deleteProductFailed': 'Impossible de supprimer ce produit.',
 
   'profile.title': 'Profil',
   'profile.roleVendor': 'Vendeur',
@@ -926,7 +938,7 @@ const fr: Partial<Record<TranslationKey, string>> = {
   'profile.reregister': "Réenregistrer les notifications",
   'profile.enableNotifs': "Activer les notifications",
   'profile.pushFailed': "Impossible d'enregistrer cet appareil.",
-  'profile.sellOnLevant': 'Vendre sur Levant',
+  'profile.sellOnLevant': 'Vendre sur Getlevant',
   'profile.becomeVendor': 'Devenir vendeur',
   'profile.becomeVendorHint': 'Publiez vos produits et touchez les acheteurs de votre région.',
   'profile.becomeVendorConfirm': 'Vous allez configurer votre boutique et votre compte passera en mode Vendeur. Prêt ?',

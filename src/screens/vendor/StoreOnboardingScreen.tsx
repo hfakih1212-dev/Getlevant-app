@@ -123,9 +123,9 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
           {/* ── Brand header ── */}
           <View style={styles.brand}>
             <View style={styles.brandMark}>
-              <Text style={styles.brandMarkText}>S</Text>
+              <Text style={styles.brandMarkText}>G</Text>
             </View>
-            <Text style={styles.brandName}>Levant</Text>
+            <Text style={styles.brandName}>Getlevant</Text>
           </View>
 
           {/* ── Welcome copy ── */}

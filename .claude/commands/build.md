@@ -9,5 +9,5 @@ Steps:
 
 To install on the connected emulator after download:
 ```
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r "$env:USERPROFILE\Downloads\levant-dev.apk"
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r "$env:USERPROFILE\Downloads\getlevant-dev.apk"
 ```

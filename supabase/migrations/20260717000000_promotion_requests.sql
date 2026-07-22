@@ -1,6 +1,6 @@
 -- Vendor-initiated "Promoted" placement requests. Payment settles
 -- off-platform (WhatsApp), consistent with checkout: the vendor files a
--- request in-app, the Souk team contacts them on their store WhatsApp to
+-- request in-app, the Getlevant team contacts them on their store WhatsApp to
 -- arrange payment, then approves with the helper below. Approval is the
 -- only path that flips products.is_promoted — the products_guard_promotion
 -- trigger still blocks any client-side write of the promotion columns.

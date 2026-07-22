@@ -63,7 +63,7 @@ async function handleNewOrder(orderId: string, db: ReturnType<typeof createClien
 
   await sendPush(
     owner.push_token as string,
-    'New order on Levant! 🛍',
+    'New order on Getlevant! 🛍',
     `${order.order_number} — $${Number(order.total_usd).toFixed(2)} USD. Open the app to accept it.`,
     { order_id: orderId, event: 'new_order' },
   )

@@ -3,7 +3,7 @@ import * as Clipboard from 'expo-clipboard'
 
 // EAS Hosting production deployment — anyone can open these in a browser
 // and browse as a guest. Paths mirror the linking config in RootNavigator.
-export const WEB_BASE_URL = 'https://souk-app.expo.app'
+export const WEB_BASE_URL = 'https://getlevant.expo.app'
 
 export function productLink(productId: string): string {
   return `${WEB_BASE_URL}/product/${productId}`

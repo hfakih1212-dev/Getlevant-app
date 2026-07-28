@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       favorites: {
@@ -660,6 +635,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_promotion_request: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
       become_vendor: { Args: never; Returns: undefined }
       current_user_role: { Args: never; Returns: string }
       ensure_my_profile: {
@@ -685,7 +664,25 @@ export type Database = {
         }
       }
       owns_store: { Args: { p_store_id: string }; Returns: boolean }
+      place_order: {
+        Args: {
+          p_delivery_address: string
+          p_delivery_region: string
+          p_items: Json
+          p_payment_method: string
+          p_store_id: string
+          p_voucher_code?: string
+        }
+        Returns: {
+          id: string
+          order_number: string
+        }[]
+      }
       redeem_referral: { Args: { p_code: string }; Returns: undefined }
+      reject_promotion_request: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
       vendor_analytics: { Args: never; Returns: Json }
     }
     Enums: {
@@ -848,9 +845,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       courier_type: [

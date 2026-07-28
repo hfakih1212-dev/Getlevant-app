@@ -162,43 +162,28 @@ export default function CheckoutScreen({ navigation }: Props) {
     setOrderError(null)
 
     try {
-      // Step A — insert the order header; the voucher trigger recomputes
-      // discount_usd and total_usd server-side and burns the voucher
-      const { data: order, error: insertError } = await supabase
-        .from('orders')
-        .insert({
-          shopper_id:       user.id,
-          store_id:         items[0].storeId,
-          status:           'placed',
-          payment_method:   paymentMethod!,
-          payment_status:   'pending',
-          subtotal_usd:     subtotal,
-          delivery_fee_usd: 0,
-          total_usd:        total,
-          voucher_code:     selectedVoucher?.code ?? null,
-          delivery_address: buildAddress(),
-          delivery_region:  region,
-          whatsapp_sent:    false,
+      // place_order() looks up each item's price from products.price_usd
+      // itself and inserts the order + order_items server-side, so pricing
+      // can't be forged by a direct API call — the client only ever supplies
+      // product/variant ids and quantities. The voucher trigger still
+      // recomputes discount_usd/total_usd from that server-computed subtotal
+      // and burns the voucher.
+      const { data: order, error: rpcError } = await supabase
+        .rpc('place_order', {
+          p_store_id:         items[0].storeId,
+          p_payment_method:   paymentMethod!,
+          p_delivery_address: buildAddress(),
+          p_delivery_region:  region!,
+          p_voucher_code:     selectedVoucher?.code,
+          p_items: items.map((i) => ({
+            product_id: i.productId,
+            variant_id: i.variantId,
+            quantity:   i.quantity,
+          })),
         })
-        .select('id, order_number')
         .single()
 
-      if (insertError) throw insertError
-
-      // Step B — insert line items, snapshotting the current unit price
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(
-          items.map((i) => ({
-            order_id:       order.id,
-            product_id:     i.productId,
-            variant_id:     i.variantId,
-            quantity:       i.quantity,
-            unit_price_usd: i.priceUsd,
-          })),
-        )
-
-      if (itemsError) throw itemsError
+      if (rpcError) throw rpcError
 
       notifyNewOrder(order.id)
       pushNotifyNewOrder(order.id)
@@ -223,7 +208,7 @@ export default function CheckoutScreen({ navigation }: Props) {
       )
       setPlacing(false)
     }
-  }, [canPlace, user, items, paymentMethod, region, subtotal, total, selectedVoucher, buildAddress, clearCart, navigation])
+  }, [canPlace, user, items, paymentMethod, region, selectedVoucher, buildAddress, clearCart, navigation, t])
 
   // ---- Render ----
 

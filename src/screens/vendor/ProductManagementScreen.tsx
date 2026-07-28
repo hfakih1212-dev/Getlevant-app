@@ -57,7 +57,7 @@ function isEffectivelyPromoted(p: { is_promoted: boolean; promotion_expires_at: 
 
 const MAX_PHOTOS = 4
 
-interface ImagePick { uri: string; key: string }
+interface ImagePick { uri: string; key: string; mimeType?: string }
 let _imgKey = 0
 const mkImgKey = () => String(_imgKey++)
 
@@ -92,6 +92,25 @@ type ScreenMode = 'list' | 'add' | 'edit'
 
 // Upload picked images to Storage and record their rows, starting at the
 // given position so edit-mode additions slot in after existing photos.
+// expo-image-picker returns file:// URIs (with a real extension) on native,
+// but blob: URIs (no extension — the whole URI has no ".") on web. Parsing
+// the URI for an extension silently mangles the storage path on web, since
+// the leftover blob:http://host:port/uuid string gets written in verbatim
+// and its "/" characters are read back as folder separators. Derive the
+// extension from the asset's mimeType instead, which is reliable on both.
+const MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/jpg':  'jpg',
+  'image/png':  'png',
+  'image/webp': 'webp',
+}
+
+function extensionFor(pick: ImagePick): string {
+  if (pick.mimeType && MIME_TO_EXT[pick.mimeType]) return MIME_TO_EXT[pick.mimeType]
+  const uriExt = pick.uri.split('.').pop()?.toLowerCase()
+  return uriExt && /^[a-z0-9]{2,4}$/.test(uriExt) ? uriExt : 'jpg'
+}
+
 async function uploadProductImages(
   storeId: string,
   productId: string,
@@ -100,7 +119,7 @@ async function uploadProductImages(
 ): Promise<void> {
   for (let i = 0; i < picks.length; i++) {
     const pick     = picks[i]
-    const ext      = pick.uri.split('.').pop()?.toLowerCase() ?? 'jpg'
+    const ext      = extensionFor(pick)
     const position = startPosition + i
     const path     = `${storeId}/${productId}/${position}-${Date.now()}.${ext}`
 
@@ -434,7 +453,9 @@ export default function ProductManagementScreen({ navigation, route }: Props) {
     if (result.canceled) return
     setImagePicks(prev => {
       const remaining = MAX_PHOTOS - existingImages.length - prev.length
-      const toAdd = result.assets.slice(0, remaining).map(a => ({ uri: a.uri, key: mkImgKey() }))
+      const toAdd = result.assets
+        .slice(0, remaining)
+        .map(a => ({ uri: a.uri, key: mkImgKey(), mimeType: a.mimeType }))
       return [...prev, ...toAdd]
     })
   }, [existingImages.length, t])

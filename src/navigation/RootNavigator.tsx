@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import * as Linking from 'expo-linking'
 import { useAuthStore } from '../store/useAuthStore'
 import { useFavoritesStore } from '../store/useFavoritesStore'
+import { isHardcodedAdmin } from '../lib/admin'
 import { syncPushToken } from '../lib/push'
 import PhoneLoginScreen from '../screens/auth/PhoneLoginScreen'
 import MarketplaceFeedScreen from '../screens/shopper/MarketplaceFeedScreen'
@@ -21,6 +22,9 @@ import ShipmentCreateScreen from '../screens/vendor/ShipmentCreateScreen'
 import ProductManagementScreen from '../screens/vendor/ProductManagementScreen'
 import StoreOnboardingScreen from '../screens/vendor/StoreOnboardingScreen'
 import StoreSettingsScreen from '../screens/vendor/StoreSettingsScreen'
+import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen'
+import AdminVendorListScreen from '../screens/admin/AdminVendorListScreen'
+import AdminVendorCardScreen from '../screens/admin/AdminVendorCardScreen'
 import ProfileScreen from '../screens/shared/ProfileScreen'
 import RewardCelebration from '../components/RewardCelebration'
 
@@ -48,6 +52,13 @@ export type VendorStackParamList = {
   StoreSettings: undefined
   ShipmentCreate: { orderId: string; orderNumber: string }
   ProductManagement: { productId?: string } | undefined
+  Profile: undefined
+}
+
+export type AdminStackParamList = {
+  AdminDashboard: undefined
+  VendorList: undefined
+  VendorCard: { storeId: string; name: string }
   Profile: undefined
 }
 
@@ -83,6 +94,7 @@ const linking: LinkingOptions<ShopperStackParamList> = {
 
 const VendorNav = createNativeStackNavigator<VendorStackParamList>()
 const ShopperNav = createNativeStackNavigator<ShopperStackParamList>()
+const AdminNav = createNativeStackNavigator<AdminStackParamList>()
 
 // ---------------------------------------------------------------------------
 // Stacks
@@ -98,6 +110,17 @@ function VendorStack() {
       <VendorNav.Screen name="ProductManagement" component={ProductManagementScreen} />
       <VendorNav.Screen name="Profile" component={ProfileScreen} />
     </VendorNav.Navigator>
+  )
+}
+
+function AdminStack() {
+  return (
+    <AdminNav.Navigator screenOptions={{ headerShown: false }}>
+      <AdminNav.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+      <AdminNav.Screen name="VendorList" component={AdminVendorListScreen} />
+      <AdminNav.Screen name="VendorCard" component={AdminVendorCardScreen} />
+      <AdminNav.Screen name="Profile" component={ProfileScreen} />
+    </AdminNav.Navigator>
   )
 }
 
@@ -162,7 +185,13 @@ export default function RootNavigator() {
   return (
     <View style={styles.flex}>
       <NavigationContainer linking={linking}>
-        {user?.role === 'vendor' ? <VendorStack /> : <ShopperStack signedIn={session !== null} />}
+        {isHardcodedAdmin(user?.email) ? (
+          <AdminStack />
+        ) : user?.role === 'vendor' ? (
+          <VendorStack />
+        ) : (
+          <ShopperStack signedIn={session !== null} />
+        )}
       </NavigationContainer>
       {/* Celebratory pop-up for freshly minted loyalty rewards */}
       {session !== null && <RewardCelebration />}

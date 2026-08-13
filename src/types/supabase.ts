@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       favorites: {
@@ -118,7 +143,6 @@ export type Database = {
           total_usd: number
           updated_at: string | null
           voucher_code: string | null
-          whatsapp_sent: boolean
         }
         Insert: {
           created_at?: string | null
@@ -138,7 +162,6 @@ export type Database = {
           total_usd: number
           updated_at?: string | null
           voucher_code?: string | null
-          whatsapp_sent?: boolean
         }
         Update: {
           created_at?: string | null
@@ -158,7 +181,6 @@ export type Database = {
           total_usd?: number
           updated_at?: string | null
           voucher_code?: string | null
-          whatsapp_sent?: boolean
         }
         Relationships: [
           {
@@ -537,7 +559,9 @@ export type Database = {
         Row: {
           created_at: string | null
           description: string | null
+          facebook: string | null
           id: string
+          instagram: string | null
           logo_url: string | null
           name: string
           owner_id: string
@@ -549,7 +573,9 @@ export type Database = {
         Insert: {
           created_at?: string | null
           description?: string | null
+          facebook?: string | null
           id?: string
+          instagram?: string | null
           logo_url?: string | null
           name: string
           owner_id: string
@@ -561,7 +587,9 @@ export type Database = {
         Update: {
           created_at?: string | null
           description?: string | null
+          facebook?: string | null
           id?: string
+          instagram?: string | null
           logo_url?: string | null
           name?: string
           owner_id?: string
@@ -684,6 +712,9 @@ export type Database = {
         Returns: undefined
       }
       vendor_analytics: { Args: never; Returns: Json }
+      admin_vendor_analytics: { Args: never; Returns: Json }
+      admin_vendor_list: { Args: never; Returns: Json }
+      admin_vendor_card: { Args: { p_store_id: string }; Returns: Json }
     }
     Enums: {
       courier_type:
@@ -845,6 +876,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       courier_type: [

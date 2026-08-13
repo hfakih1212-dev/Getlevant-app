@@ -25,15 +25,13 @@ import type { Json } from '../../types/supabase'
 // ---------------------------------------------------------------------------
 
 interface NotifPrefs {
-  order_updates:      boolean
-  promotions:         boolean
-  whatsapp_reminders: boolean
+  order_updates: boolean
+  promotions:    boolean
 }
 
 const DEFAULT_PREFS: NotifPrefs = {
-  order_updates:      true,
-  promotions:         false,
-  whatsapp_reminders: true,
+  order_updates: true,
+  promotions:    false,
 }
 
 function parseNotifPrefs(raw: Json): NotifPrefs {
@@ -50,10 +48,6 @@ function parseNotifPrefs(raw: Json): NotifPrefs {
       typeof obj.promotions === 'boolean'
         ? obj.promotions
         : DEFAULT_PREFS.promotions,
-    whatsapp_reminders:
-      typeof obj.whatsapp_reminders === 'boolean'
-        ? obj.whatsapp_reminders
-        : DEFAULT_PREFS.whatsapp_reminders,
   }
 }
 
@@ -317,7 +311,10 @@ export default function ProfileScreen() {
 
   const contact = user?.phone ?? user?.email ?? ''
   const initial = contact.trim().replace(/^\+/, '').charAt(0).toUpperCase() || '?'
-  const roleLabel = user?.role === 'vendor' ? t('profile.roleVendor') : t('profile.roleShopper')
+  const roleLabel =
+    user?.role === 'vendor' ? t('profile.roleVendor') :
+    user?.role === 'admin'  ? t('profile.roleAdmin')  :
+    t('profile.roleShopper')
   const loyalty = getLoyaltyProgress(ordersCount)
 
   // ---- Render ----
@@ -429,7 +426,7 @@ export default function ProfileScreen() {
           </View>
 
           {/* ── Phone number ── */}
-          <SectionLabel text={t('profile.whatsappContact')} />
+          <SectionLabel text={t('profile.phoneSection')} />
           <SectionCard>
             <View style={styles.phoneRow}>
               <View style={styles.phoneLabelCol}>
@@ -489,13 +486,6 @@ export default function ProfileScreen() {
               value={prefs.promotions}
               onValueChange={v => handleToggle('promotions', v)}
               loading={savingPref === 'promotions'}
-            />
-            <ToggleRow
-              label={t('profile.waReminders')}
-              hint={t('profile.waRemindersHint')}
-              value={prefs.whatsapp_reminders}
-              onValueChange={v => handleToggle('whatsapp_reminders', v)}
-              loading={savingPref === 'whatsapp_reminders'}
               isLast
             />
             {prefsError ? (

@@ -55,7 +55,7 @@ order, and track delivery to your door, all in one app.
 • List products with photos, variants, and stock counts
 • Manage orders through a clear pipeline: accept, prepare, dispatch, deliver
 • Assign couriers and give buyers live tracking
-• Get instant WhatsApp notifications for new orders
+• Get instant push notifications for new orders
 • See your revenue, top categories, and regional reach at a glance
 
 Payments settle directly between you and the seller — the way business is
@@ -85,7 +85,7 @@ Getlevant is free to join for shoppers and sellers.
 • اعرض منتجاتك مع الصور والخيارات والكميات
 • أدر طلباتك بمسار واضح: قبول، تحضير، إرسال، توصيل
 • عيّن موصّلين وامنح المشترين تتبعًا مباشرًا
-• استقبل إشعارات واتساب فورية للطلبات الجديدة
+• استقبل إشعارات فورية للطلبات الجديدة
 • شاهد إيراداتك وأفضل فئاتك وانتشارك الجغرافي بنظرة واحدة
 
 الدفع يتم مباشرة بينك وبين البائع — كما تُدار الأعمال فعلًا في لبنان. بلا بطاقات، بلا تعقيد، بلا انتظار.
@@ -116,7 +116,7 @@ une seule app.
 • Publiez vos produits avec photos, variantes et stocks
 • Gérez vos commandes avec un pipeline clair : accepter, préparer, expédier, livrer
 • Assignez des coursiers et offrez un suivi en direct
-• Recevez des notifications WhatsApp instantanées pour chaque commande
+• Recevez des notifications instantanées pour chaque commande
 • Visualisez revenus, meilleures catégories et portée régionale en un coup d'œil
 
 Les paiements se règlent directement entre vous et le vendeur — comme les

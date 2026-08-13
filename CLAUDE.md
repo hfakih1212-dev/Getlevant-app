@@ -8,7 +8,7 @@ Getlevant is a mobile-first marketplace app connecting shoppers with local vendo
 - **State**: Zustand (`src/store/`)
 - **Backend**: Supabase (PostgreSQL, Auth, RLS, Storage, Realtime, Edge Functions)
 - **Auth**: Email OTP via Resend (Send Email Hook → `send-otp-email` Edge Function)
-- **Notifications**: WhatsApp Cloud API via `whatsapp-notify` Edge Function
+- **Notifications**: Expo push via `push-notify` Edge Function
 - **Builds**: EAS (Expo Application Services) — project `@faks1231/getlevant` (new project, forked 2026-07-22 from `@faks1231/souk-app` — see "Rename follow-ups" below for why)
 
 ## Key Credentials & IDs
@@ -33,7 +33,7 @@ src/
     useCartStore.ts   — Zustand cart (items, addItem, clearCart)
   lib/
     supabase.ts    — createClient with SecureStore adapter
-    whatsapp.ts    — fire-and-forget Edge Function caller
+    push.ts        — Expo push token registration + fire-and-forget Edge Function caller
   navigation/
     RootNavigator.tsx  — Auth / Shopper / Vendor stacks; role from users.role
   types/
@@ -41,14 +41,14 @@ src/
 
 supabase/
   functions/
-    whatsapp-notify/   — WhatsApp Cloud API notifications
+    push-notify/       — Expo push notifications
     send-otp-email/    — Resend email hook (auth Send Email Hook)
   migrations/          — ordered SQL files, applied via supabase db push
 ```
 
 ## Database Schema (key tables)
 - `public.users` — mirrors auth.users; columns: id, email, phone, role, store_id, notification_prefs, push_token
-- `public.stores` — vendor stores; columns: id, owner_id, name, region, whatsapp, ...
+- `public.stores` — vendor stores; columns: id, owner_id, name, region, whatsapp, instagram, facebook, ...
 - `public.products` — catalog; belongs to store
 - `public.product_variants` — size/color/stock
 - `public.product_images` — Storage-backed image URLs
@@ -138,7 +138,6 @@ npx supabase secrets set KEY=value --project-ref fhsnjdwciwzpkzwvcbrl
   a new build.
 
 ## Pending / Known Issues
-- WhatsApp notifications deployed but `WHATSAPP_API_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` secrets not set
 - Three remote-write actions blocked by the auto-mode permission classifier all session
   (2026-07-20 through 2026-07-22, every form tried — plain, `--yes`, non-interactive) —
   all three need a human to run them:

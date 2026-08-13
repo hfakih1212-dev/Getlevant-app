@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
   ListRenderItem,
   StyleSheet,
   Text,
@@ -26,7 +27,7 @@ type Props = NativeStackScreenProps<ShopperStackParamList, 'StoreProfile'>
 const fetchStore = (id: string) =>
   supabase
     .from('stores')
-    .select('id, name, description, region, rating, logo_url, created_at')
+    .select('id, name, description, region, rating, logo_url, created_at, instagram, facebook')
     .eq('id', id)
     .maybeSingle()
 
@@ -157,6 +158,10 @@ export default function StoreProfileScreen({ route, navigation }: Props) {
     [navigation],
   )
 
+  const handleOpenSocial = useCallback((url: string) => {
+    Linking.openURL(url).catch(() => {})
+  }, [])
+
   const handleShare = useCallback(async () => {
     if (!store) return
     const outcome = await shareLink(
@@ -266,6 +271,29 @@ export default function StoreProfileScreen({ route, navigation }: Props) {
               {store.description ? (
                 <Text style={styles.heroBio}>{store.description}</Text>
               ) : null}
+
+              {(store.instagram || store.facebook) && (
+                <View style={styles.socialRow}>
+                  {store.instagram ? (
+                    <TouchableOpacity
+                      style={styles.socialPill}
+                      onPress={() => handleOpenSocial(store.instagram!)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={styles.socialPillText}>Instagram</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {store.facebook ? (
+                    <TouchableOpacity
+                      style={styles.socialPill}
+                      onPress={() => handleOpenSocial(store.facebook!)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={styles.socialPillText}>Facebook</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              )}
 
               <Text style={styles.sectionLabel}>Shop the collection</Text>
             </View>
@@ -429,6 +457,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 12,
     marginBottom: 18,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 18,
+  },
+  socialPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: '#F5EFE6',
+  },
+  socialPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1C1612',
   },
   sectionLabel: {
     alignSelf: 'flex-start',

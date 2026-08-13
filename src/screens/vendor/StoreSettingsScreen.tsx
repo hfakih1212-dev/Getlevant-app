@@ -48,6 +48,13 @@ function normalizePhone(raw: string): string {
   return '+961' + cleaned
 }
 
+function normalizeSocial(raw: string, domain: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  return `https://${domain}/${trimmed.replace(/^@/, '')}`
+}
+
 // ---------------------------------------------------------------------------
 // StoreSettingsScreen
 // ---------------------------------------------------------------------------
@@ -60,6 +67,8 @@ export default function StoreSettingsScreen({ navigation }: Props) {
   const [name,        setName]        = useState('')
   const [description, setDescription] = useState('')
   const [whatsapp,    setWhatsapp]    = useState('')
+  const [instagram,   setInstagram]   = useState('')
+  const [facebook,    setFacebook]    = useState('')
   const [region,      setRegion]      = useState<LebanonRegion | null>(null)
 
   const [loading, setLoading] = useState(true)
@@ -71,7 +80,9 @@ export default function StoreSettingsScreen({ navigation }: Props) {
   const [logoUploading, setLogoUploading] = useState(false)
   const [logoError,     setLogoError]     = useState<string | null>(null)
 
-  const normalizedPhone = normalizePhone(whatsapp)
+  const normalizedPhone     = normalizePhone(whatsapp)
+  const normalizedInstagram = normalizeSocial(instagram, 'instagram.com')
+  const normalizedFacebook  = normalizeSocial(facebook, 'facebook.com')
 
   // ---- Load existing store ----
 
@@ -82,7 +93,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
     async function load() {
       const { data, error: fetchErr } = await supabase
         .from('stores')
-        .select('id, name, description, whatsapp, region, logo_url')
+        .select('id, name, description, whatsapp, instagram, facebook, region, logo_url')
         .eq('owner_id', user!.id)
         .maybeSingle()
 
@@ -99,6 +110,8 @@ export default function StoreSettingsScreen({ navigation }: Props) {
         setName(data.name ?? '')
         setDescription(data.description ?? '')
         setWhatsapp(data.whatsapp ?? '')
+        setInstagram(data.instagram ?? '')
+        setFacebook(data.facebook ?? '')
         setRegion((data.region as LebanonRegion) ?? null)
         setLogoUrl(data.logo_url)
       }
@@ -125,6 +138,8 @@ export default function StoreSettingsScreen({ navigation }: Props) {
         name:        name.trim(),
         description: description.trim() || null,
         whatsapp:    normalizedPhone || null,
+        instagram:   normalizedInstagram || null,
+        facebook:    normalizedFacebook || null,
         region:      region!,
       })
       .eq('id', storeId)
@@ -137,7 +152,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
     }
 
     setSaving(false)
-  }, [storeId, canSave, name, description, normalizedPhone, region, navigation])
+  }, [storeId, canSave, name, description, normalizedPhone, normalizedInstagram, normalizedFacebook, region, navigation])
 
   // ---- Logo upload — stored beside product photos under the store's folder ----
 
@@ -302,7 +317,7 @@ export default function StoreSettingsScreen({ navigation }: Props) {
           </View>
 
           {/* ── Contact ── */}
-          <Text style={styles.sectionLabel}>{t('storeSettings.whatsappContact')}</Text>
+          <Text style={styles.sectionLabel}>{t('storeSettings.contact')}</Text>
           <View style={styles.card}>
             <Text style={styles.inputLabel}>
               {t('onboarding.whatsappNumber')} <Text style={styles.optional}>{t('common.optional')}</Text>
@@ -320,6 +335,44 @@ export default function StoreSettingsScreen({ navigation }: Props) {
             {whatsapp.trim().length > 0 && (
               <Text style={styles.phonePreview}>
                 {t('storeSettings.savesAs')} <Text style={styles.phonePreviewValue}>{normalizedPhone}</Text>
+              </Text>
+            )}
+
+            <Text style={[styles.inputLabel, { marginTop: 12 }]}>
+              {t('onboarding.instagramHandle')} <Text style={styles.optional}>{t('common.optional')}</Text>
+            </Text>
+            <TextInput
+              style={[styles.input, { marginTop: 6 }]}
+              value={instagram}
+              onChangeText={setInstagram}
+              placeholder="@yourstore"
+              placeholderTextColor="#B0A090"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+            />
+            {instagram.trim().length > 0 && (
+              <Text style={styles.phonePreview}>
+                {t('storeSettings.savesAs')} <Text style={styles.phonePreviewValue}>{normalizedInstagram}</Text>
+              </Text>
+            )}
+
+            <Text style={[styles.inputLabel, { marginTop: 12 }]}>
+              {t('onboarding.facebookHandle')} <Text style={styles.optional}>{t('common.optional')}</Text>
+            </Text>
+            <TextInput
+              style={[styles.input, { marginTop: 6 }]}
+              value={facebook}
+              onChangeText={setFacebook}
+              placeholder="yourstorepage"
+              placeholderTextColor="#B0A090"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+            />
+            {facebook.trim().length > 0 && (
+              <Text style={styles.phonePreview}>
+                {t('storeSettings.savesAs')} <Text style={styles.phonePreviewValue}>{normalizedFacebook}</Text>
               </Text>
             )}
           </View>

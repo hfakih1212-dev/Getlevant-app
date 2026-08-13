@@ -89,7 +89,7 @@ export async function syncPushToken(userId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Fire-and-forget notification triggers (mirrors lib/whatsapp.ts)
+// Fire-and-forget notification triggers
 // ---------------------------------------------------------------------------
 
 async function call(payload: Record<string, unknown>): Promise<void> {

@@ -19,7 +19,6 @@ import { useAuthStore } from '../../store/useAuthStore'
 import { useCartStore } from '../../store/useCartStore'
 import { Database } from '../../types/supabase'
 import type { ShopperStackParamList } from '../../navigation/RootNavigator'
-import { notifyNewOrder } from '../../lib/whatsapp'
 import { pushNotifyNewOrder } from '../../lib/push'
 
 type Props = NativeStackScreenProps<ShopperStackParamList, 'Checkout'>
@@ -185,7 +184,6 @@ export default function CheckoutScreen({ navigation }: Props) {
 
       if (rpcError) throw rpcError
 
-      notifyNewOrder(order.id)
       pushNotifyNewOrder(order.id)
       orderPlacedRef.current = true
       clearCart()

@@ -16,7 +16,6 @@ import Skeleton from '../../components/Skeleton'
 import { CATEGORY_LABEL, CONDITION_OPTIONS, LEBANON_REGIONS, LebanonRegion, ProductCategory } from '../../lib/catalog'
 import { TranslationKey, useT } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
-import { notifyStatusChanged } from '../../lib/whatsapp'
 import { pushNotifyStatusChanged } from '../../lib/push'
 import { useAuthStore } from '../../store/useAuthStore'
 import { Database } from '../../types/supabase'
@@ -549,7 +548,6 @@ export default function VendorDashboardScreen({ navigation }: Props) {
         .eq('id', orderId)
 
       if (!updateErr) {
-        notifyStatusChanged(orderId, next)
         pushNotifyStatusChanged(orderId, next)
         setOrders(prev =>
           prev.map(o => (o.id === orderId ? { ...o, status: next } : o)),

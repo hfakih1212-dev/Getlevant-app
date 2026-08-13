@@ -26,6 +26,8 @@ async function sendPush(to: string, title: string, body: string, data: Record<st
 // Helpers
 // ---------------------------------------------------------------------------
 
+class ForbiddenError extends Error {}
+
 function first<T>(val: T | T[] | null | undefined): T | null {
   if (val == null) return null
   return Array.isArray(val) ? (val[0] ?? null) : val
@@ -44,18 +46,21 @@ const STATUS_TEXT: Partial<Record<string, string>> = {
 // Handlers
 // ---------------------------------------------------------------------------
 
-// New order → push to the vendor (store owner)
-async function handleNewOrder(orderId: string, db: ReturnType<typeof createClient>): Promise<void> {
+// New order → push to the vendor (store owner). Fires from CheckoutScreen
+// right after a shopper places their own order, so the caller must be that
+// order's shopper.
+async function handleNewOrder(orderId: string, callerId: string, db: ReturnType<typeof createClient>): Promise<void> {
   const { data: order, error } = await db
     .from('orders')
     .select(`
-      order_number, total_usd,
+      order_number, total_usd, shopper_id,
       stores ( owner:users!stores_owner_id_fkey ( push_token ) )
     `)
     .eq('id', orderId)
     .single()
 
   if (error || !order) throw new Error(`Order not found: ${error?.message}`)
+  if (order.shopper_id !== callerId) throw new ForbiddenError()
 
   const store = first((order as Record<string, unknown>).stores as unknown[]) as Record<string, unknown> | null
   const owner = first(store?.owner as unknown[]) as Record<string, unknown> | null
@@ -69,25 +74,33 @@ async function handleNewOrder(orderId: string, db: ReturnType<typeof createClien
   )
 }
 
-// Status change → push to the shopper, respecting order_updates preference
+// Status change → push to the shopper, respecting order_updates preference.
+// Caller must be the shopper or the vendor who owns the store; the message
+// always reflects the real DB status, never the payload's claim.
 async function handleStatusChanged(
-  orderId:   string,
-  newStatus: string,
+  orderId:  string,
+  callerId: string,
   db: ReturnType<typeof createClient>,
 ): Promise<void> {
-  const body = STATUS_TEXT[newStatus]
-  if (!body) return
-
   const { data: order, error } = await db
     .from('orders')
     .select(`
-      order_number,
+      order_number, status, shopper_id,
+      stores ( owner_id ),
       shopper:users!orders_shopper_id_fkey ( push_token, notification_prefs )
     `)
     .eq('id', orderId)
     .single()
 
   if (error || !order) throw new Error(`Order not found: ${error?.message}`)
+
+  const store = first((order as Record<string, unknown>).stores as unknown[]) as Record<string, string> | null
+  const isShopper = order.shopper_id === callerId
+  const isVendor  = store?.owner_id === callerId
+  if (!isShopper && !isVendor) throw new ForbiddenError()
+
+  const body = STATUS_TEXT[order.status as string]
+  if (!body) return
 
   const shopper = first((order as Record<string, unknown>).shopper as unknown[]) as Record<string, unknown> | null
   if (!isExpoToken(shopper?.push_token)) return
@@ -99,7 +112,7 @@ async function handleStatusChanged(
     shopper!.push_token as string,
     `Order ${order.order_number}`,
     body,
-    { order_id: orderId, event: 'status_changed', status: newStatus },
+    { order_id: orderId, event: 'status_changed', status: order.status as string },
   )
 }
 
@@ -125,6 +138,7 @@ Deno.serve(async (req: Request) => {
   if (!authHeader.startsWith('Bearer ')) {
     return new Response('Unauthorized', { status: 401, headers: CORS })
   }
+  const token = authHeader.slice('Bearer '.length)
 
   // Service role — reads push tokens across RLS boundaries
   const db = createClient(
@@ -132,7 +146,12 @@ Deno.serve(async (req: Request) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
 
-  let payload: { event: string; order_id: string; new_status?: string }
+  const { data: { user: caller }, error: callerErr } = await db.auth.getUser(token)
+  if (callerErr || !caller) {
+    return new Response('Unauthorized', { status: 401, headers: CORS })
+  }
+
+  let payload: { event: string; order_id: string }
   try {
     payload = await req.json()
   } catch {
@@ -141,15 +160,21 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (payload.event === 'new_order') {
-      await handleNewOrder(payload.order_id, db)
-    } else if (payload.event === 'status_changed' && payload.new_status) {
-      await handleStatusChanged(payload.order_id, payload.new_status, db)
+      await handleNewOrder(payload.order_id, caller.id, db)
+    } else if (payload.event === 'status_changed') {
+      await handleStatusChanged(payload.order_id, caller.id, db)
     }
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { 'Content-Type': 'application/json', ...CORS },
     })
   } catch (err) {
+    if (err instanceof ForbiddenError) {
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Forbidden' }),
+        { status: 403, headers: { 'Content-Type': 'application/json', ...CORS } },
+      )
+    }
     console.error('[push-notify]', err)
     return new Response(
       JSON.stringify({ ok: false, error: String(err) }),

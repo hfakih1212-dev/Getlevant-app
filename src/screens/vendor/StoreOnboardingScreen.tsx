@@ -52,6 +52,18 @@ function normalizePhone(raw: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Social handle normalization — accepts a bare handle ("@name" or "name") or
+// a full URL, and always stores a canonical profile URL.
+// ---------------------------------------------------------------------------
+
+function normalizeSocial(raw: string, domain: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  return `https://${domain}/${trimmed.replace(/^@/, '')}`
+}
+
+// ---------------------------------------------------------------------------
 // StoreOnboardingScreen
 // ---------------------------------------------------------------------------
 
@@ -62,12 +74,16 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
   const [name,        setName]        = useState('')
   const [description, setDescription] = useState('')
   const [whatsapp,    setWhatsapp]    = useState('')
+  const [instagram,   setInstagram]   = useState('')
+  const [facebook,    setFacebook]    = useState('')
   const [region,      setRegion]      = useState<LebanonRegion | null>(null)
   const [saving,      setSaving]      = useState(false)
   const [formError,   setFormError]   = useState<string | null>(null)
 
-  // ---- Derived phone preview ----
-  const normalizedPhone = normalizePhone(whatsapp)
+  // ---- Derived previews ----
+  const normalizedPhone     = normalizePhone(whatsapp)
+  const normalizedInstagram = normalizeSocial(instagram, 'instagram.com')
+  const normalizedFacebook  = normalizeSocial(facebook, 'facebook.com')
 
   // ---- Validation ----
   const canSubmit =
@@ -93,6 +109,8 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
         name:        name.trim(),
         description: description.trim() || null,
         whatsapp:    normalizedPhone || null,
+        instagram:   normalizedInstagram || null,
+        facebook:    normalizedFacebook || null,
         region:      region,
         status:      'active',
       })
@@ -105,7 +123,7 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
 
     // Replace this screen with a fresh VendorDashboard — store now exists
     navigation.replace('VendorDashboard')
-  }, [name, description, normalizedPhone, region, user?.id, navigation, t])
+  }, [name, description, normalizedPhone, normalizedInstagram, normalizedFacebook, region, user?.id, navigation, t])
 
   // ---- Render ----
   return (
@@ -189,6 +207,44 @@ export default function StoreOnboardingScreen({ navigation }: Props) {
               </Text>
             )}
             <Text style={styles.fieldHint}>{t('onboarding.phoneHint')}</Text>
+
+            <Text style={styles.inputLabel}>
+              {t('onboarding.instagramHandle')} <Text style={styles.optional}>{t('common.optional')}</Text>
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={instagram}
+              onChangeText={setInstagram}
+              placeholder="@yourstore"
+              placeholderTextColor="#B0A090"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+            />
+            {instagram.trim().length > 0 && (
+              <Text style={styles.phonePreview}>
+                {t('onboarding.savedAs')} <Text style={styles.phonePreviewValue}>{normalizedInstagram}</Text>
+              </Text>
+            )}
+
+            <Text style={styles.inputLabel}>
+              {t('onboarding.facebookHandle')} <Text style={styles.optional}>{t('common.optional')}</Text>
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={facebook}
+              onChangeText={setFacebook}
+              placeholder="yourstorepage"
+              placeholderTextColor="#B0A090"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+            />
+            {facebook.trim().length > 0 && (
+              <Text style={styles.phonePreview}>
+                {t('onboarding.savedAs')} <Text style={styles.phonePreviewValue}>{normalizedFacebook}</Text>
+              </Text>
+            )}
           </View>
 
           {/* ── Region ── */}

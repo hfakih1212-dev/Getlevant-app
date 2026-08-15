@@ -31,7 +31,8 @@
       "expo-secure-store",
       "expo-image",
       "expo-notifications",
-      "expo-localization"
+      "expo-localization",
+      "expo-status-bar"
     ],
     "owner": "faks1231",
     "extra": {
